@@ -1,0 +1,4638 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>五行棋盘 · 计划2</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; height: 100%; overflow: hidden;
+    background: #05080e; color: #dbe3f0;
+    font-family: "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
+    user-select: none;
+  }
+  #app {
+    display: grid; height: 100vh; gap: 1px; background: #1c2534;
+    grid-template-columns: 1fr 348px;
+    grid-template-rows: 54px 1fr 154px;
+  }
+  header {
+    grid-column: 1 / 3; grid-row: 1;
+    display: flex; align-items: center; gap: 16px; padding: 0 16px;
+    background: linear-gradient(180deg, #121a28, #0d131e);
+  }
+  .brand { font-size: 17px; font-weight: 700; letter-spacing: 3px; color: #e8eefb; }
+  .brand span { font-size: 11px; letter-spacing: 1px; color: #5c708f; margin-left: 6px; }
+  #phaseInfo { font-size: 13px; color: #8fa6c8; min-width: 180px; }
+  #runInfo { font-size: 12px; color: #7f93b0; white-space: nowrap; }
+  #orderList { display: flex; gap: 6px; flex: 1; font-size: 12px; flex-wrap: wrap; }
+  .order-chip {
+    padding: 3px 9px; border-radius: 20px; background: #17202e;
+    border: 1px solid #253247; color: #7d8ea8;
+  }
+  .order-chip.now { background: #1f3550; border-color: #4a7fb5; color: #d6e9ff; }
+  .order-chip[data-camp="0"] { box-shadow: inset 0 -2px 0 #4fd1e8; }
+  .order-chip[data-camp="1"] { box-shadow: inset 0 -2px 0 #f06b6b; }
+  .order-chip.skip { opacity: .4; text-decoration: line-through; }
+  #restartBtn, #shutdownBtn {
+    background: #1b2637; color: #a9bcd8; border: 1px solid #2b3a52;
+    padding: 6px 14px; border-radius: 6px; font-size: 12px; cursor: pointer;
+  }
+  #restartBtn:hover { background: #223147; color: #dbe9ff; }
+  #shutdownBtn {
+    background: #241a1f; color: #c79aa4; border: 1px solid #3d2a33;
+  }
+  #shutdownBtn:hover:not(:disabled) { background: #33202a; color: #f0c3cc; border-color: #6b3d4a; }
+  #shutdownBtn:disabled { opacity: .45; cursor: default; }
+
+  #stage {
+    grid-column: 1; grid-row: 2; position: relative; overflow: hidden;
+    background: #05080e;
+  }
+  #bgVideo {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    object-fit: cover; object-position: center;
+    z-index: 0; pointer-events: none;
+    opacity: .9; filter: saturate(1) brightness(.82) blur(.5px);
+  }
+  #bgShade {
+    position: absolute; inset: 0; z-index: 1; pointer-events: none;
+    background:
+      radial-gradient(circle at 50% 38%, rgba(8, 14, 24, .04) 0%, rgba(5, 8, 14, .28) 70%),
+      linear-gradient(180deg, rgba(5, 8, 14, .12), rgba(5, 8, 14, .34));
+  }
+  #stage canvas {
+    display: block; position: absolute; inset: 0; z-index: 2;
+    background: transparent;
+  }
+  #skillCard { z-index: 6; }
+  #hint {
+    position: absolute; bottom: 18px; left: 50%; transform: translateX(-50%);
+    font-size: 13px; color: #a9c7ee; padding: 7px 18px; border-radius: 20px;
+    background: rgba(10, 18, 30, 0.78); border: 1px solid #23374f;
+    pointer-events: none; white-space: nowrap;
+  }
+  #victoryCinematic {
+    position: absolute; inset: 0; z-index: 28; display: none;
+    background: #05080e; overflow: hidden;
+  }
+  #victoryCinematic.show { display: block; }
+  #victoryCinematic video {
+    position: absolute; inset: 0; display: block; width: 100%; height: 100%;
+  }
+  #victoryVideoBackdrop {
+    z-index: 0; object-fit: cover;
+    filter: blur(18px) brightness(.48) saturate(.9);
+    transform: scale(1.08);
+  }
+  #victoryVideo { z-index: 1; object-fit: contain; }
+  #winPrompt {
+    position: absolute; inset: 0; z-index: 29;
+    display: flex; align-items: flex-start; justify-content: center;
+    padding-top: 20px;
+    opacity: 0; visibility: hidden; pointer-events: none;
+    transition: opacity .18s ease, visibility .18s;
+  }
+  #winPrompt.show { opacity: 1; visibility: visible; }
+  #winPrompt .win-box {
+    width: min(174px, 24%); overflow: hidden; border-radius: 10px;
+    background: var(--modal); border: 2px solid var(--line-blue);
+    box-shadow: 0 0 0 2px rgba(216, 180, 90, .35), 0 20px 50px rgba(0, 0, 0, .5);
+  }
+  #winPrompt img { display: block; width: 100%; height: auto; mix-blend-mode: multiply; }
+  #skillCard {
+    position: absolute; top: 16px; right: 16px; width: 272px;
+    padding: 12px 14px; border-radius: 10px; pointer-events: none;
+    background: rgba(12, 20, 32, 0.9); border: 1px solid #2a3d56;
+    backdrop-filter: blur(6px); box-shadow: 0 10px 30px rgba(0, 0, 0, .45);
+    transition: opacity .12s, transform .12s;
+  }
+  #skillCard.hidden { opacity: 0; transform: translateY(-6px); }
+  .sc-top { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  #scCat {
+    font-size: 10px; letter-spacing: 2px; padding: 2px 7px;
+    border-radius: 4px; background: #1b2739; color: #9db6d6;
+  }
+  #scName { font-size: 14px; font-weight: 600; color: #e6eefb; }
+  .sc-cost { font-size: 11px; color: #e0b25c; margin-bottom: 6px; }
+  .sc-desc { font-size: 12px; line-height: 1.7; color: #a7bcd8; }
+
+  #toast {
+    position: absolute; top: 18px; left: 50%; z-index: 12;
+    transform: translateX(-50%) translateY(-8px);
+    padding: 8px 16px; border-radius: 20px; font-size: 12px; color: #ffe6b0;
+    background: rgba(40, 30, 12, .92); border: 1px solid #6b5320;
+    opacity: 0; pointer-events: none; transition: all .2s; white-space: nowrap;
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  #relicCard {
+    position: absolute; top: 16px; left: 16px; width: 232px; z-index: 5;
+    background: rgba(12, 20, 32, .9); border: 1px solid #2a3d56; border-radius: 10px;
+    backdrop-filter: blur(6px); box-shadow: 0 10px 30px rgba(0, 0, 0, .4);
+    overflow: hidden; font-size: 12px;
+  }
+  #relicHead {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 12px; cursor: pointer; letter-spacing: 2px; color: #cfe0f6;
+    background: #0e1726;
+  }
+  #relicHead b { color: #e0b25c; }
+  #relicList {
+    padding: 8px 12px 10px; display: flex; flex-direction: column; gap: 7px;
+    max-height: 320px; overflow-y: auto;
+  }
+  #relicCard.collapsed #relicList { display: none; }
+  .relic-item { display: flex; flex-direction: column; gap: 1px; }
+  .relic-item .rn { color: #e6eefb; font-weight: 600; }
+  .relic-item .rk { font-size: 10px; color: #7f93b0; }
+  .relic-item .rd { font-size: 11px; color: #93a6c2; line-height: 1.5; }
+
+  .pick-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .pick-grid.three { grid-template-columns: repeat(3, 1fr); }
+  .pick-grid.three .pick-card { padding: 10px 8px; }
+  .pick-grid.three .pc-name { font-size: 13px; }
+  .pick-grid.three .pc-desc { font-size: 11px; }
+  .pick-grid.four { grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  .pick-grid.four .pick-card {
+    padding: 8px; display: flex; flex-direction: column; gap: 7px; text-align: center;
+  }
+  .pick-grid.sword .pick-card {
+    padding: 8px; display: flex; flex-direction: column; gap: 6px; text-align: left;
+  }
+  .pick-grid.sword .pc-name { text-align: center; margin-bottom: 0; }
+  .pick-grid.sword .pc-kind { text-align: center; margin-bottom: 2px; }
+  .pick-grid.sword .pc-desc { font-size: 11px; line-height: 1.55; }
+  .pc-portrait {
+    aspect-ratio: 3 / 4; overflow: hidden; border-radius: 8px;
+    background: #0a121d; border: 1px solid #223247;
+  }
+  .pc-portrait img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: center top; }
+  .pc-head {
+    display: flex; align-items: center; justify-content: center; gap: 5px;
+    font-size: 14px; font-weight: 700; color: #eaf2ff; white-space: nowrap;
+  }
+  .pc-attr {
+    font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 4px;
+    background: color-mix(in srgb, var(--attr) 20%, transparent); color: var(--attr);
+  }
+  #modal.companion-pick .modal-box { width: 900px; }
+  #modal.sword-pick .modal-box { width: 600px; }
+  .pick-card {
+    text-align: left; padding: 12px; border-radius: 10px; cursor: pointer;
+    background: #141d2b; border: 1px solid #24344a; color: #c6d6ea;
+    font-family: inherit; transition: all .12s;
+  }
+  .pick-card:hover { background: #1d2a3d; border-color: #4a7fb5; }
+  .pick-card.selected { background: #1d2e46; border-color: #5d92c9; box-shadow: 0 0 0 1px #3a648f inset; }
+  .pc-name { font-size: 15px; font-weight: 700; color: #eaf2ff; margin-bottom: 4px; }
+  .pc-kind { font-size: 10px; letter-spacing: 1px; margin-bottom: 6px; }
+  .pc-desc { font-size: 12px; color: #93a6c2; line-height: 1.6; }
+
+  #banner {
+    position: absolute; inset: 0; display: none; place-items: center;
+    background: rgba(4, 7, 12, 0.72); backdrop-filter: blur(3px);
+  }  #banner.show { display: grid; }
+  #banner .box {
+    text-align: center; padding: 34px 52px; border-radius: 16px;
+    background: #101a2a; border: 1px solid #2b4364; box-shadow: 0 20px 60px rgba(0,0,0,.6);
+  }
+  #banner h2 { margin: 0 0 8px; font-size: 26px; letter-spacing: 4px; }
+  #banner p { margin: 0 0 18px; font-size: 13px; color: #8fa6c8; }
+  #banner button {
+    padding: 9px 26px; border-radius: 8px; cursor: pointer; font-family: inherit;
+    background: #1f3550; border: 1px solid #4a7fb5; color: #d6e9ff; font-size: 13px;
+  }
+
+  #side {
+    grid-column: 2; grid-row: 2 / 4;
+    display: flex; flex-direction: column; background: #0a111c;
+    border-left: 1px solid #1c2534; min-height: 0;
+  }
+  #mapPanel {
+    flex: 6 1 0; min-height: 0; display: flex; flex-direction: column;
+    border-bottom: 1px solid #1c2534;
+  }
+  #mapViewport { flex: 1 1 auto; min-height: 0; position: relative; overflow: hidden; }
+  #mapBody {
+    position: absolute; inset: 0 0 0 38px; overflow: auto; padding: 0;
+  }
+  #mapBody::-webkit-scrollbar { width: 7px; height: 7px; }
+  #mapBody::-webkit-scrollbar-thumb { background: #22304a; border-radius: 3px; }
+  #mapLayerLabels {
+    position: absolute; left: 0; top: 0; bottom: 0; width: 38px; z-index: 4;
+    pointer-events: none; overflow: hidden;
+    background: linear-gradient(90deg, rgba(10, 17, 28, .96), rgba(10, 17, 28, .65));
+  }
+  #mapCanvas { position: relative; }
+  #mapCanvas svg { position: absolute; inset: 0; pointer-events: none; }
+  .map-edge { fill: none; stroke: #2f4d70; stroke-width: 1.2; opacity: .5; }
+  .map-edge.active { stroke: #5b9bd5; opacity: .9; }
+  .map-canvas .map-node {
+    position: absolute; width: 96px; height: 30px; padding: 0; box-sizing: border-box;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; white-space: nowrap;
+  }
+  .map-canvas .map-node.current { background: #1f3550; color: #fff; border-color: #6fa5d6; box-shadow: 0 0 0 1px #4a7fb5; }
+  .map-layer-label { position: absolute; left: 8px; font-size: 10px; color: #405675; transform: translateY(-50%); }
+  .map-row { display: flex; align-items: center; gap: 10px; padding: 4px 0; }
+  .map-idx { width: 16px; text-align: right; font-size: 10px; color: #55688a; }
+  .map-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .map-node {
+    font-size: 11px; padding: 4px 10px; border-radius: 14px;
+    background: #141d2b; border: 1px solid #24344a; color: #7d8ea8;
+  }
+  .map-node.t-fight { color: #e8917f; border-color: #4a2b33; }
+  .map-node.t-event { color: #b79df0; border-color: #3d2f5c; }
+  .map-node.t-rest { color: #79c7a5; border-color: #2b4a3d; }
+  .map-node.t-boss { color: #e8c05a; border-color: #4a3d22; }
+  .map-node.option { color: #fff; box-shadow: 0 0 0 1px currentColor; background: #1a2637; }
+  .map-node.taken { background: #1f3550; color: #d6e9ff; border-color: #4a7fb5; box-shadow: none; }
+  .map-row.current .map-idx { color: #9fc2ef; font-weight: 700; }
+  #skillPanel {
+    flex: 6 1 0; min-height: 0; display: flex; flex-direction: column;
+    border-bottom: 1px solid #1c2534;
+  }
+  .sp-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 9px 12px; font-size: 13px; color: #cfe0f6;
+    background: #0e1726; border-bottom: 1px solid #1a2434;
+  }
+  .sp-head small { color: #6f86a6; font-size: 11px; }
+  #spBody { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 4px 10px 8px; }
+  #spFoot {
+    flex: 0 0 auto; padding: 10px 12px 12px;
+    background: #0d1624; border-top: 1px solid #1a2434;
+  }
+  #draftInfo {
+    font-size: 11px; color: #7f93b0; margin-bottom: 7px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  #draftInfo b { color: #cfe0f6; font-weight: 500; }
+  #confirmBtn {
+    width: 100%; padding: 11px; border-radius: 8px; cursor: pointer;
+    background: linear-gradient(180deg, #3f7fb5, #2c5f8f);
+    border: 1px solid #6fa5d6; color: #f2f8ff; font-family: inherit;
+    font-size: 14px; font-weight: 700; letter-spacing: 3px;
+    box-shadow: 0 4px 14px rgba(40, 110, 170, .35); transition: all .12s;
+  }
+  #confirmBtn:hover:not(:disabled) { background: linear-gradient(180deg, #4a90c9, #33679a); }
+  #confirmBtn:disabled { opacity: .32; cursor: not-allowed; box-shadow: none; }
+  #spBody::-webkit-scrollbar, #log::-webkit-scrollbar { width: 6px; }
+  #spBody::-webkit-scrollbar-thumb, #log::-webkit-scrollbar-thumb { background: #22304a; border-radius: 3px; }
+  .sp-group { margin-top: 5px; }
+  .sp-cat {
+    font-size: 10px; letter-spacing: 3px; color: #5d7fae; margin: 0 0 3px 2px;
+  }
+  .sp-list { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+  .skill {
+    display: flex; align-items: center; justify-content: space-between; gap: 6px;
+    padding: 6px 8px; border-radius: 7px; cursor: pointer; text-align: left;
+    background: #141d2b; border: 1px solid #24344a; color: #c6d6ea;
+    font-family: inherit; font-size: 12px; transition: all .1s;
+  }
+  .skill small { color: #6b80a0; font-size: 10px; white-space: nowrap; }
+  .skill:hover:not(:disabled) { background: #1d2a3d; border-color: #3f6a9c; color: #eaf2ff; }
+  .skill:disabled { opacity: .28; cursor: not-allowed; }
+  .skill.active { background: #1d2e46; border-color: #5d92c9; box-shadow: 0 0 0 1px #3a648f inset; color: #eaf2ff; }
+  .sp-empty { padding: 18px 12px; font-size: 12px; color: #6f86a6; line-height: 1.8; }
+  .deploy-list { display: flex; flex-direction: column; gap: 5px; margin: 4px 0 8px; }
+  .deploy-row {
+    display: flex; align-items: center; gap: 8px; width: 100%;
+    padding: 7px 9px; border-radius: 8px; cursor: pointer; text-align: left;
+    background: #121b29; border: 1px solid #223146; color: #b9cbe2;
+    font-family: inherit; font-size: 12px; transition: all .1s;
+  }
+  .deploy-row:hover { border-color: #3f6a9c; }
+  .deploy-row.current { border-color: #5d92c9; background: #1a2940; box-shadow: 0 0 0 1px #3a648f inset; }
+  .deploy-row .dn { color: var(--attr); font-weight: 700; }
+  .deploy-row .da { color: #6f86a6; font-size: 10px; }
+  .deploy-row .dc { margin-left: auto; color: #8fa6c8; font-size: 11px; }
+  .deploy-row.current .dc { color: #eaf2ff; }
+  .deploy-actions { display: flex; gap: 6px; margin-top: 2px; }
+  .deploy-actions button {
+    flex: 1; padding: 7px 8px; border-radius: 7px; cursor: pointer;
+    background: #141d2b; border: 1px solid #24344a; color: #9fb4d1;
+    font-family: inherit; font-size: 11px;
+  }
+  .deploy-actions button:hover:not(:disabled) { background: #1d2a3d; border-color: #3f6a9c; color: #eaf2ff; }
+  .deploy-actions button:disabled { opacity: .32; cursor: not-allowed; }
+  .deploy-tip { padding: 6px 2px 2px; }
+  .deploy-tip b { color: #cfe0f6; }
+
+  #startScreen {
+    position: fixed; inset: 0; z-index: 60; display: none; place-items: center;
+    background: radial-gradient(circle at 50% 40%, #142033 0%, #05080e 70%);
+  }
+  #startScreen.show { display: grid; }
+  .start-card {
+    width: 460px; padding: 40px 42px 34px; border-radius: 18px; text-align: center;
+    background: rgba(16, 26, 42, .94); border: 1px solid #2b4364;
+    box-shadow: 0 30px 80px rgba(0, 0, 0, .6);
+  }
+  .start-title { font-size: 30px; letter-spacing: 10px; font-weight: 700; color: #e8f0ff; }
+  .start-sub { margin-top: 8px; font-size: 12px; letter-spacing: 3px; color: #5d7fae; }
+  .diff-block { margin: 30px 0 6px; }
+  .diff-label { font-size: 12px; letter-spacing: 3px; color: #8fa6c8; margin-bottom: 10px; }
+  .diff-row { display: flex; align-items: center; justify-content: center; gap: 16px; }
+  .diff-row button {
+    width: 34px; height: 34px; border-radius: 8px; cursor: pointer; font-size: 12px;
+    background: #1b2637; border: 1px solid #2b3a52; color: #a9bcd8;
+  }
+  .diff-row button:hover { background: #223147; color: #dbe9ff; }
+  #diffVal { font-size: 30px; font-weight: 700; color: #cfe4ff; min-width: 54px; }
+  .start-note { font-size: 12px; color: #6f86a6; margin: 14px 0 26px; }
+  .start-note b { color: #e0b25c; font-weight: 600; }
+  #startBtn {
+    width: 100%; padding: 13px; border-radius: 10px; cursor: pointer;
+    background: linear-gradient(180deg, #3f7fb5, #2c5f8f); border: 1px solid #6fa5d6;
+    color: #f2f8ff; font-size: 15px; font-weight: 700; letter-spacing: 6px; font-family: inherit;
+    box-shadow: 0 6px 20px rgba(40, 110, 170, .35);
+  }
+  #startBtn:hover { background: linear-gradient(180deg, #4a90c9, #33679a); }
+  #continueBtn {
+    width: 100%; margin-top: 10px; padding: 10px; border-radius: 10px; cursor: pointer;
+    background: #1b2637; border: 1px solid #2b3a52; color: #a9bcd8;
+    font-size: 13px; letter-spacing: 4px; font-family: inherit;
+  }
+  #continueBtn:hover { background: #223147; color: #dbe9ff; }
+
+  .attr-wheel { display: flex; justify-content: center; }
+  .attr-wheel svg { width: 300px; height: 300px; }
+  .attr-node { cursor: pointer; }
+  .attr-node circle { transition: all .12s; }
+  .attr-node:hover circle { fill-opacity: .32; }
+  .attr-node.selected circle { stroke-width: 4; fill-opacity: .45; }
+
+  #modal {
+    position: absolute; inset: 0; z-index: 30; display: none; place-items: center;
+    background: rgba(4, 7, 12, .62); backdrop-filter: blur(3px);
+  }
+  #modal.show { display: grid; }
+  .modal-box {
+    width: 520px; max-width: calc(100vw - 40px); padding: 26px 28px 22px; border-radius: 14px;
+    background: #101a2a; border: 1px solid #2b4364; box-shadow: 0 24px 70px rgba(0, 0, 0, .6);
+  }
+  #modalTitle { font-size: 19px; font-weight: 700; letter-spacing: 2px; color: #e6eefb; margin-bottom: 8px; }
+  #modalBody { font-size: 13px; line-height: 1.85; color: #a7bcd8; margin-bottom: 18px; }
+  #modalBody .muted { color: #6f86a6; font-size: 12px; }
+  #modalActions { display: flex; flex-wrap: wrap; gap: 10px; }
+  .modal-btn {
+    flex: 1 1 150px; padding: 11px 16px; border-radius: 9px; cursor: pointer;
+    background: #172234; border: 1px solid #2c3d56; color: #cfdcf0;
+    font-size: 13px; font-family: inherit; transition: all .12s;
+  }
+  .modal-btn:hover { background: #22334a; border-color: #4a7fb5; color: #fff; }
+  .modal-btn.primary {
+    background: linear-gradient(180deg, #3f7fb5, #2c5f8f); border-color: #6fa5d6;
+    color: #f2f8ff; font-weight: 700; letter-spacing: 2px;
+  }
+  .modal-btn.t-fight { border-color: #7a3a3a; color: #ffb3b3; }
+  .modal-btn.t-event { border-color: #5c4a8a; color: #cdb8ff; }
+  .modal-btn.t-rest { border-color: #336b58; color: #a8e8cc; }
+  .modal-btn.t-boss { border-color: #8a6a2a; color: #ffd98a; }
+  .modal-btn.lucky {
+    border-color: #d8b45a; color: #ffe7a3;
+    background: linear-gradient(180deg, #49391d, #2c2417);
+    box-shadow: 0 0 16px rgba(216, 180, 90, .35);
+  }
+  .lucky-tip { color: #ffd98a; margin-bottom: 8px; }
+
+  #log {
+    flex: 2 1 0; min-height: 0; padding: 8px 12px; overflow-y: auto;
+    font-size: 12px; line-height: 1.65;
+  }
+  .log-item { padding: 3px 0; border-bottom: 1px dashed #141e2c; color: #93a6c2; }
+  .log-item b { color: #dbe9ff; font-weight: 500; }
+  .log-item.round { color: #5d7fae; text-align: center; letter-spacing: 2px; border: none; margin: 6px 0; }
+  .log-item.dmg { color: #e8917f; }
+  .log-item.evade { color: #79c7a5; }
+  .log-item.move { color: #9fb6d8; }
+  .log-item.spell { color: #b79df0; }
+  .log-item.note { color: #6d7d95; }
+  .log-item.boss {
+    color: #7a4e0c; font-weight: 700; line-height: 1.7;
+    background: rgba(216, 180, 90, .18); border-bottom: none;
+    border-left: 3px solid #b8862f; border-radius: 5px;
+    padding: 6px 8px; margin: 5px 0;
+  }
+
+  #unitBar {
+    grid-column: 1; grid-row: 3;
+    display: flex; gap: 8px; padding: 10px 12px; overflow-x: auto;
+    background: #0a111c; border-top: 1px solid #1c2534;
+  }
+  .card {
+    --camp: #4fd1e8; --attr: #8fa6c8;
+    position: relative; min-width: 172px; flex: 1; padding: 8px 10px 7px;
+    border-radius: 9px; background: #111a28; border: 1px solid #1f2b3e;
+    border-left: 3px solid var(--camp); transition: all .15s;
+  }
+  .card.current { background: #16233a; border-color: #3c6d9e; box-shadow: 0 0 0 1px #3c6d9e, 0 0 18px rgba(60,109,158,.35); }
+  .card.dead { opacity: .35; filter: grayscale(1); }
+  .card.weak { border-color: #6a4a9c; }
+  .card-top { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+  .card-top .nm { font-weight: 600; color: #e3ecfa; }
+  .tag { font-size: 10px; padding: 1px 6px; border-radius: 4px; background: #1b2739; color: #94a9c6; }
+  .tag.attr { background: color-mix(in srgb, var(--attr) 22%, transparent); color: var(--attr); }
+  .tag.camp { background: color-mix(in srgb, var(--camp) 20%, transparent); color: var(--camp); }
+  .tag.status { background: #2a1f3d; color: #b79df0; }
+  .hpbar { position: relative; height: 15px; margin: 6px 0 4px; border-radius: 4px; background: #1a2331; overflow: hidden; }
+  .hpbar i { position: absolute; inset: 0 auto 0 0; display: block; background: linear-gradient(90deg, #2f6fa8, #4fa8d8); transition: width .3s; }
+  .hpbar b { position: absolute; inset: 0; font-size: 10px; font-weight: 500; display: grid; place-items: center; color: #dfeaf8; letter-spacing: .5px; }
+  .stats { display: flex; flex-wrap: wrap; gap: 8px; font-size: 11px; color: #7f93b0; }
+  .dec { font-size: 11px; color: #6f86a6; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .dec b { color: #9fc2ef; font-weight: 500; }
+  .card .intro {
+    margin-top: 5px; padding-top: 4px; border-top: 1px dashed rgba(31, 53, 80, .28);
+    font-size: 11px; line-height: 1.45; color: #7a684b;
+  }
+  .card { cursor: pointer; }
+  .card.dossier-active {
+    border-color: #6d9fd4;
+    box-shadow: 0 0 0 1px #4f7fae, 0 0 16px rgba(79, 127, 174, .35);
+  }
+
+  #unitDossier {
+    position: absolute; left: 16px; bottom: 16px; z-index: 7;
+    width: 220px; max-height: calc(100% - 32px); overflow-y: auto;
+    display: flex; flex-direction: column;
+    background: rgba(10, 17, 28, .94); border: 1px solid #2a3d56; border-radius: 12px;
+    box-shadow: 0 18px 46px rgba(0, 0, 0, .55); backdrop-filter: blur(8px);
+    opacity: 0; visibility: hidden; transform: translateY(10px);
+    transition: opacity .16s ease, transform .16s ease, visibility .16s;
+    pointer-events: none;
+  }
+  #unitDossier.show {
+    opacity: 1; visibility: visible; transform: translateY(0); pointer-events: auto;
+  }
+  #unitDossier::-webkit-scrollbar { width: 6px; }
+  #unitDossier::-webkit-scrollbar-thumb { background: #22304a; border-radius: 3px; }
+  #dossierClose {
+    position: absolute; top: 8px; right: 8px; z-index: 2;
+    width: 24px; height: 24px; padding: 0; border-radius: 50%; cursor: pointer;
+    background: rgba(8, 14, 24, .72); border: 1px solid #35506f;
+    color: #9fb6d8; font-size: 14px; line-height: 1; font-family: inherit;
+  }
+  #dossierClose:hover { color: #fff; border-color: #6fa5d6; }
+  #dossierArt {
+    position: relative; overflow: hidden; aspect-ratio: 3 / 4;
+    border-radius: 11px 11px 0 0; background: #0a121d;
+  }
+  #dossierArt img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: center top; }
+  #dossierArt::after {
+    content: ''; position: absolute; inset: auto 0 0 0; height: 38%;
+    background: linear-gradient(180deg, transparent, rgba(10, 17, 28, .96));
+    pointer-events: none;
+  }
+  #dossierName {
+    position: absolute; left: 12px; right: 38px; bottom: 9px; z-index: 1;
+    font-size: 16px; font-weight: 700; letter-spacing: 1px; color: #f0f6ff;
+    text-shadow: 0 2px 8px rgba(0, 0, 0, .85);
+  }
+  #dossierInfo { padding: 9px 11px 11px; }
+  #dossierTags { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 8px; }
+  .ds-cap { font-size: 10px; letter-spacing: 2px; color: #6f86a6; margin-bottom: 5px; }
+  .ds-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 5px 7px; }
+  .ds-stat {
+    display: flex; align-items: center; gap: 5px; padding: 4px 6px; border-radius: 6px;
+    background: #111b2a; border: 1px solid #1d2a3d; font-size: 11px; color: #8ea4c3;
+  }
+  .ds-ico { display: flex; flex: none; }
+  .ds-ico svg { width: 13px; height: 13px; }
+  .ds-stat b { margin-left: auto; font-size: 11px; font-weight: 600; color: #dfeaf8; }
+  .ds-intro {
+    margin-top: 9px; padding-top: 7px; border-top: 1px dashed rgba(31, 53, 80, .28);
+    font-size: 12px; line-height: 1.65; color: #6f5f45;
+  }
+
+  #app { gap: 2px; }
+  header { background: linear-gradient(180deg, #f3e9d3, #e9dcbe); }
+  .brand { color: #332b1e; }
+  .brand span { color: #8b7752; }
+  #phaseInfo { color: #6f5f43; }
+  #runInfo { color: #7a694b; }
+  .order-chip { background: #f7efdd; color: #6d5f47; }
+  .order-chip.now { background: #f0dfb8; color: #42536c; }
+  #restartBtn, #shutdownBtn { background: #f7efdd; color: #5b4e39; }
+  #restartBtn:hover { background: #fff8e8; color: #332b1e; }
+  #shutdownBtn { background: #f6e7e2; color: #8a4c58; }
+  #shutdownBtn:hover:not(:disabled) { background: #fbece7; color: #7d2f3c; }
+  #side { background: #efe4c9; border-left-width: 2px; }
+  #mapPanel { background: #f1e6cc; border-bottom-width: 2px; }
+  #mapBody { background: #f1e6cc; }
+  #mapLayerLabels { background: linear-gradient(90deg, rgba(241, 230, 204, .98), rgba(241, 230, 204, .72)); }
+  .map-layer-label { color: #8a7751; }
+  .map-idx { color: #8a7751; }
+  .map-node { background: #f8f0de; color: #6b5c42; border-width: 1.5px; }
+  .map-node.t-fight { color: #b4533f; }
+  .map-node.t-event { color: #7b5fc0; }
+  .map-node.t-rest { color: #3f8a68; }
+  .map-node.t-boss { color: #a97a1e; }
+  .map-node.option { background: #f3e6c8; color: #3f3420; }
+  .map-node.taken { background: #eee0bd; color: #4f5b6b; }
+  .map-canvas .map-node.current { background: #f0dfb8; color: #3b4a60; }
+  .map-row.current .map-idx { color: #8a5f23; }
+  .sp-head { background: #e8dabb; color: #4c3f2b; border-bottom-width: 2px; }
+  .sp-head small { color: #8a7651; }
+  #spFoot { background: #ecdfc2; border-top-width: 2px; }
+  #draftInfo { color: #7c6a4c; }
+  #draftInfo b { color: #3e3322; }
+  .sp-cat { color: #947b4b; }
+  .skill { background: #f8f0de; color: #4a3f2e; border-width: 1.5px; }
+  .skill small { color: #8a7651; }
+  .skill:hover:not(:disabled) { background: #fff8e9; color: #2f271b; }
+  .skill.active { background: #f1e0b9; color: #2f271b; }
+  .sp-empty { color: #8a7651; }
+  .deploy-row { background: #f8f0de; color: #4f4230; border-width: 1.5px; }
+  .deploy-row.current { background: #f1e0b9; }
+  .deploy-row .dn { color: color-mix(in srgb, var(--attr) 62%, #2b2318); }
+  .deploy-row .da { color: #8a7651; }
+  .deploy-row .dc { color: #6d5c40; }
+  .attr-node text {
+    font-weight: 700; paint-order: stroke;
+    stroke: rgba(255, 252, 244, .9); stroke-width: 3px;
+  }
+  .deploy-row.current .dc { color: #3e3322; }
+  .deploy-actions button { background: #f8f0de; color: #5b4c36; border-width: 1.5px; }
+  .deploy-actions button:hover:not(:disabled) { background: #fff8e9; color: #2f271b; }
+  .deploy-tip b { color: #3e3322; }
+  #log { background: #f4ead4; }
+  .log-item { color: #6b5a3f; border-bottom-color: #cfbd97; }
+  .log-item b { color: #3b2f1e; }
+  .log-item.round { color: #8b6d34; }
+  .log-item.dmg { color: #a33d31; }
+  .log-item.evade { color: #2f7a5f; }
+  .log-item.move { color: #3f5e83; }
+  .log-item.spell { color: #6a4aa0; }
+  .log-item.note { color: #877452; }
+  #unitBar { background: #eadfc4; border-top-width: 2px; }
+  .card { background: #f8f0de; border-width: 2px 2px 2px 3px; }
+  .card.current { background: #f3e3bd; }
+  .card-top .nm { color: #332a1c; }
+  .tag { background: #e6d9b8; color: #6f6047; }
+  .tag.attr {
+    background: color-mix(in srgb, var(--attr) 26%, #fbf5e8);
+    color: color-mix(in srgb, var(--attr) 62%, #2b2318);
+  }
+  .tag.camp {
+    background: color-mix(in srgb, var(--camp) 24%, #fbf5e8);
+    color: color-mix(in srgb, var(--camp) 62%, #2b2318);
+  }
+  .tag.status { background: #e4d6ef; color: #6a4a9a; }
+  .hpbar { background: #d9c9a5; }
+  .stats { color: #6f5f45; }
+  .dec { color: #837050; }
+  .dec b { color: #3e5f8b; }
+  #hint { background: rgba(247, 239, 222, .9); color: #4a3f2e; }
+  #skillCard, #relicCard, #unitDossier {
+    background: rgba(247, 239, 222, .96); border-width: 2px;
+  }
+  #scCat { background: #e6d9b8; color: #6f6047; }
+  #scName { color: #332a1c; }
+  .sc-cost { color: #9a6a12; }
+  .sc-desc { color: #6f5f45; }
+  #relicHead { background: #e8dabb; color: #4c3f2b; }
+  #relicHead b { color: #9a6a12; }
+  .relic-item .rn { color: #332a1c; }
+  .relic-item .rk { color: #8a7651; }
+  .relic-item .rd { color: #6f5f45; }
+  #unitDossier { width: 280px; }
+  #dossierClose { background: rgba(250, 244, 231, .85); color: #5b4c36; }
+  #dossierClose:hover { color: #1f1a12; }
+  #dossierArt { background: #e4d7b8; }
+  #dossierArt::after { background: linear-gradient(180deg, transparent, rgba(247, 239, 222, .97)); }
+  #dossierName { font-size: 18px; color: #2f271b; text-shadow: 0 1px 6px rgba(255, 255, 255, .45); }
+  #dossierInfo { padding: 12px 14px 14px; }
+  #dossierTags { margin-bottom: 10px; }
+  .ds-cap { font-size: 11px; color: #8a7651; }
+  .ds-stat { padding: 6px 8px; font-size: 12px; color: #5b4c36; border-width: 1.5px; }
+  .ds-ico svg { width: 15px; height: 15px; }
+  .ds-stat b { font-size: 12px; color: #2f271b; }
+  .modal-box { background: #f5ecd8; border-width: 2px; }
+  #modalTitle { color: #332a1c; }
+  #modalBody { color: #6f5f45; }
+  #modalBody .muted { color: #8a7651; }
+  .modal-btn { background: #faf3e4; color: #5b4c36; border-width: 1.5px; }
+  .modal-btn:hover { background: #fff8e9; color: #2f271b; }
+  .modal-btn.t-fight { color: #9b3b3b; }
+  .modal-btn.t-event { color: #6a4aa0; }
+  .modal-btn.t-rest { color: #2f7a58; }
+  .modal-btn.t-boss { color: #8a620d; }
+  .pick-card { background: #faf3e4; color: #5b4c36; border-width: 1.5px; }
+  .pick-card:hover { background: #fff8e9; color: #2f271b; }
+  .pick-card.selected { background: #f2e1ba; color: #2f271b; }
+  .pc-name, .pc-head { color: #332a1c; }
+  .pc-desc { color: #7a684b; }
+  .pc-portrait { background: #e4d7b8; border-width: 1.5px; }
+  #banner .box { background: #f5ecd8; border-width: 2px; }
+  #banner h2 { color: #332a1c; }
+  #banner p { color: #7a684b; }
+  #banner button { background: #faf3e4; color: #5b4c36; border-width: 1.5px; }
+  #banner button:hover { background: #fff8e9; color: #2f271b; }
+  #startScreen { background: #0a0d12; overflow: hidden; }
+  #startScreen::before {
+    content: ''; position: absolute; inset: -24px; z-index: 0;
+    background: url('/美术资源/背景图/image_generated_20261019_183935_393_0_f985c28b-6763-42f9-bfe4-d7e5a739186e.jpg') center / cover no-repeat;
+    filter: blur(12px) brightness(.64) saturate(.9);
+    transform: scale(1.05);
+  }
+  #startScreen::after {
+    content: ''; position: absolute; inset: 0; z-index: 0;
+    background:
+      radial-gradient(circle at 50% 40%, rgba(4, 7, 12, .08), rgba(4, 7, 12, .55)),
+      linear-gradient(180deg, rgba(4, 7, 12, .14), rgba(4, 7, 12, .42));
+  }
+  .start-card {
+    position: relative; z-index: 1; background: rgba(245, 236, 216, .95); border-width: 2px;
+  }
+  .start-title { color: #332a1c; }
+  .start-sub { color: #8a7651; }
+  .diff-label { color: #6f5f43; }
+  .diff-row button { background: #faf3e4; color: #5b4c36; border-width: 1.5px; }
+  .diff-row button:hover { background: #fff8e9; color: #2f271b; }
+  #diffVal { color: #332a1c; }
+  .start-note { color: #7a684b; }
+  .start-note b { color: #9a6a12; }
+  #continueBtn { background: #faf3e4; color: #5b4c36; border-width: 1.5px; }
+  #continueBtn:hover { background: #fff8e9; color: #2f271b; }
+
+  :root {
+    --paper: #d8c7a5;
+    --paper-2: #dccbaa;
+    --paper-head: #d0bd97;
+    --paper-foot: #d5c4a1;
+    --card: #e6d8ba;
+    --card-soft: #e9dcc1;
+    --card-hover: #f0e2c4;
+    --card-active: #e2cea0;
+    --modal: #ddcfb0;
+    --line-blue: #1f3550;
+  }
+  #app { background: var(--line-blue); }
+  header {
+    background: linear-gradient(180deg, #e0cfad, #d2c09c);
+    border-bottom: 2px solid var(--line-blue);
+  }
+  #side { background: var(--paper); border-left: 3px solid var(--line-blue); }
+  #mapPanel { background: var(--paper-2); border-bottom: 3px solid var(--line-blue); }
+  #mapBody { background: var(--paper-2); }
+  #mapLayerLabels { background: linear-gradient(90deg, rgba(220, 203, 170, .98), rgba(220, 203, 170, .72)); }
+  #skillPanel { border-bottom: 3px solid var(--line-blue); }
+  #log { background: #dfd0b1; }
+  #spFoot { background: var(--paper-foot); border-top: 2px solid var(--line-blue); }
+  .sp-head { background: var(--paper-head); border-bottom: 2px solid var(--line-blue); }
+  #relicHead { background: var(--paper-head); }
+  #unitBar { background: #d3c19d; border-top: 3px solid var(--line-blue); }
+  .order-chip { background: var(--card); }
+  .order-chip.now { background: var(--card-active); }
+  #restartBtn, #shutdownBtn { background: var(--card-soft); }
+  #restartBtn:hover { background: var(--card-hover); }
+  #shutdownBtn { background: #e8d6d1; }
+  #shutdownBtn:hover:not(:disabled) { background: #efdfd8; }
+  .map-node { background: var(--card); border-color: var(--line-blue); border-width: 1.5px; }
+  .map-node.option { background: var(--card-active); }
+  .map-node.taken { background: #d9c8a4; }
+  .map-canvas .map-node.current { background: var(--card-active); }
+  .skill { background: var(--card); border-width: 1.5px; }
+  .skill:hover:not(:disabled) { background: var(--card-hover); }
+  .skill.active { background: var(--card-active); }
+  .deploy-row { background: var(--card); border-width: 1.5px; }
+  .deploy-row.current { background: var(--card-active); }
+  .deploy-actions button { background: var(--card); border-width: 1.5px; }
+  .deploy-actions button:hover:not(:disabled) { background: var(--card-hover); }
+  .card {
+    background: var(--card); border-color: var(--line-blue);
+    border-width: 2px 2px 2px 3px; border-left-color: var(--camp);
+  }
+  .card.current { background: var(--card-active); border-color: var(--line-blue); }
+  .tag { background: #d5c2a0; }
+  .tag.attr { background: color-mix(in srgb, var(--attr) 26%, #eee2c7); }
+  .tag.camp { background: color-mix(in srgb, var(--camp) 24%, #eee2c7); }
+  .tag.status { background: #d9c8e4; }
+  .hpbar { background: #c7b48e; }
+  #hint { background: rgba(224, 208, 180, .92); }
+  #skillCard, #relicCard, #unitDossier {
+    background: rgba(224, 208, 180, .97); border: 2px solid var(--line-blue);
+  }
+  #scCat { background: #d5c2a0; }
+  #dossierClose { background: rgba(232, 219, 195, .9); border-color: var(--line-blue); }
+  #dossierArt { background: var(--paper-head); }
+  #dossierArt::after { background: linear-gradient(180deg, transparent, rgba(224, 208, 180, .97)); }
+  .ds-stat { background: #eee2c7; border-color: var(--line-blue); border-width: 1.5px; }
+  .modal-box { background: var(--modal); border: 2px solid var(--line-blue); }
+  .modal-btn { background: var(--card-soft); border-width: 1.5px; }
+  .modal-btn:hover { background: var(--card-hover); }
+  .pick-card { background: var(--card-soft); border: 1.5px solid var(--line-blue); }
+  .pick-card:hover { background: var(--card-hover); }
+  .pick-card.selected { background: var(--card-active); border-color: var(--line-blue); }
+  .pc-portrait { background: var(--paper-head); border-color: var(--line-blue); border-width: 1.5px; }
+  #banner .box { background: var(--modal); border: 2px solid var(--line-blue); }
+  #banner button { background: var(--card-soft); border-width: 1.5px; }
+  #banner button:hover { background: var(--card-hover); }
+  .start-card { background: rgba(220, 205, 177, .95); border: 2px solid var(--line-blue); }
+  .diff-row button { background: var(--card-soft); border-width: 1.5px; }
+  .diff-row button:hover { background: var(--card-hover); }
+  #continueBtn { background: var(--card-soft); border-width: 1.5px; }
+  #continueBtn:hover { background: var(--card-hover); }
+  #rulesBtn {
+    width: 100%; margin-top: 10px; padding: 10px; border-radius: 10px; cursor: pointer;
+    background: var(--card-soft); border: 1.5px solid var(--line-blue); color: #5b4c36;
+    font-size: 13px; letter-spacing: 4px; font-family: inherit;
+  }
+  #rulesBtn:hover { background: var(--card-hover); color: #2f271b; }
+  #rulesModal {
+    position: fixed; inset: 0; z-index: 70; display: none; place-items: center;
+    padding: 24px; background: rgba(4, 7, 12, .66); backdrop-filter: blur(4px);
+  }
+  #rulesModal.show { display: grid; }
+  .rules-box {
+    width: min(920px, calc(100vw - 48px)); max-height: min(86vh, 900px);
+    display: flex; flex-direction: column; overflow: hidden;
+    background: var(--modal); border: 2px solid var(--line-blue); border-radius: 14px;
+    box-shadow: 0 30px 80px rgba(0, 0, 0, .65);
+  }
+  .rules-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 11px 18px; font-size: 16px; font-weight: 700; letter-spacing: 3px;
+    color: #332a1c; background: var(--paper-head);
+    border-bottom: 2px solid var(--line-blue);
+  }
+  #rulesClose {
+    width: 28px; height: 28px; padding: 0; border-radius: 50%; cursor: pointer;
+    background: var(--card-soft); border: 1px solid var(--line-blue);
+    color: #5b4c36; font-size: 16px; line-height: 1; font-family: inherit;
+  }
+  #rulesClose:hover { background: var(--card-hover); color: #1f1a12; }
+  .rules-body {
+    padding: 18px 26px 28px; overflow-y: auto; user-select: text;
+    font-size: 13px; line-height: 1.8; color: #4a3f2e;
+  }
+  .rules-body h1 { margin: 0 0 8px; font-size: 22px; letter-spacing: 2px; color: #332a1c; }
+  .rules-body h2 {
+    margin: 20px 0 8px; padding-bottom: 5px; font-size: 17px; color: #332a1c;
+    border-bottom: 1px solid #b9a682;
+  }
+  .rules-body h3 { margin: 14px 0 6px; font-size: 14px; color: #4c3f2b; }
+  .rules-body p { margin: 6px 0 10px; }
+  .rules-body ul, .rules-body ol { margin: 6px 0 10px; padding-left: 22px; }
+  .rules-body li { margin: 2px 0; }
+  .rules-body blockquote {
+    margin: 8px 0 12px; padding: 6px 10px; color: #6f5f45;
+    border-left: 3px solid #b8862f; background: rgba(216, 180, 90, .14);
+  }
+  .rules-body hr { margin: 14px 0; border: none; border-top: 1px solid #b9a682; }
+  .rules-body table {
+    width: 100%; margin: 8px 0 14px; border-collapse: collapse;
+    font-size: 12px; line-height: 1.6;
+  }
+  .rules-body th, .rules-body td {
+    padding: 5px 7px; border: 1px solid #b9a682; text-align: left; vertical-align: top;
+  }
+  .rules-body th { background: #d5c2a0; color: #332a1c; }
+  .rules-body code { padding: 1px 4px; border-radius: 3px; background: #e8dbc2; }
+  .rules-body .muted { color: #8a7651; }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="brand">五行棋盘<span>计划3</span></div>
+    <div id="phaseInfo">第 1 / 30 回合 · 决策阶段</div>
+    <div id="runInfo"></div>
+    <div id="orderList"></div>
+    <button id="restartBtn">重新开始</button>
+    <button id="shutdownBtn">关闭服务</button>
+  </header>
+
+  <main id="stage">
+    <video id="bgVideo" autoplay muted loop playsinline preload="auto"></video>
+    <div id="bgShade"></div>
+    <div id="hint"></div>
+    <div id="toast"></div>
+    <div id="relicCard" class="collapsed">
+      <div id="relicHead"><span>藏品</span><b id="relicCount">0</b></div>
+      <div id="relicList"></div>
+    </div>
+    <div id="skillCard" class="hidden">
+      <div class="sc-top"><span id="scCat"></span><span id="scName"></span></div>
+      <div id="scCost" class="sc-cost"></div>
+      <div id="scDesc" class="sc-desc"></div>
+    </div>
+    <div id="unitDossier" aria-hidden="true">
+      <button id="dossierClose" type="button" title="关闭">×</button>
+      <div id="dossierArt">
+        <img id="dossierImg" alt="" />
+        <div id="dossierName"></div>
+      </div>
+      <div id="dossierInfo">
+        <div id="dossierTags"></div>
+        <div class="ds-cap">基础属性</div>
+        <div class="ds-stats" id="dossierStats"></div>
+        <div id="dossierIntro" class="ds-intro"></div>
+      </div>
+    </div>
+    <div id="victoryCinematic" aria-hidden="true">
+      <video id="victoryVideoBackdrop" playsinline muted preload="auto" aria-hidden="true"></video>
+      <video id="victoryVideo" playsinline preload="auto"></video>
+    </div>
+    <div id="winPrompt" aria-hidden="true">
+      <div class="win-box"><img id="winPromptImg" alt="你获胜了" /></div>
+    </div>
+    <div id="modal">
+      <div class="modal-box">
+        <div id="modalTitle"></div>
+        <div id="modalBody"></div>
+        <div id="modalActions"></div>
+      </div>
+    </div>
+    <div id="banner">
+      <div class="box">
+        <h2 id="bannerTitle"></h2>
+        <p id="bannerSub"></p>
+        <button id="bannerBtn">再来一局</button>
+      </div>
+    </div>
+  </main>
+
+  <aside id="side">
+    <div id="mapPanel">
+      <div class="sp-head"><span>路线</span><small id="mapInfo"></small></div>
+      <div id="mapViewport">
+        <div id="mapLayerLabels"></div>
+        <div id="mapBody"></div>
+      </div>
+    </div>
+    <div id="skillPanel">
+      <div class="sp-head"><span id="spUnit">准备中</span><small id="spNote"></small></div>
+      <div id="spBody"></div>
+      <div id="spFoot">
+        <div id="draftInfo">未选择技能</div>
+        <button id="confirmBtn" disabled>确定决策</button>
+      </div>
+    </div>
+    <div id="log"></div>
+  </aside>
+
+  <footer id="unitBar"></footer>
+</div>
+
+<div id="startScreen">
+  <div class="start-card">
+    <div class="start-title">五行棋盘</div>
+    <div class="start-sub">肉 鸽 · 七 层 路 线</div>
+    <div class="diff-block">
+      <div class="diff-label">难度</div>
+      <div class="diff-row">
+        <button id="diffDown">▼</button>
+        <b id="diffVal">5</b>
+        <button id="diffUp">▲</button>
+      </div>
+    </div>
+    <div class="start-note">幸运值 <b id="luckVal">40</b><br>敌人属性：×<b id="diffMul">1.0</b></div>
+    <button id="startBtn">开始游戏</button>
+    <button id="continueBtn">继续上次</button>
+    <button id="rulesBtn">查看规则</button>
+  </div>
+</div>
+
+<div id="rulesModal" aria-hidden="true">
+  <div class="rules-box">
+    <div class="rules-head"><span>规则书</span><button id="rulesClose" type="button" title="关闭">×</button></div>
+    <div id="rulesBody" class="rules-body"></div>
+  </div>
+</div>
+
+
+
+<script type="importmap">
+{ "imports": { "three": "./程序/three.module.js" } }
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+
+const R_OUT = 5 / (2 * Math.sin(Math.PI / 5));
+const SECTOR = Math.PI * 2 / 5;
+const NEIGHBOR_DIST = 1.35;
+
+const ATTR_NAME = ['金', '木', '水', '火', '土'];
+const ATTR_HEX = ['#e8c05a', '#5fbf7a', '#4e8fe8', '#ee6a55', '#a9744f'];
+const ATTR_FILL_HEX = ['#4e3c12', '#1b3d27', '#17345c', '#5a1e16', '#422a1c'];
+const ATTR_BRIGHT_HEX = ['#f7dc86', '#8ce3a5', '#8cc0ff', '#ff9d89', '#d6a67e'];
+const CELL_FILL_NEUTRAL = '#2a3142';
+const CELL_BRIGHT_NEUTRAL = '#7c8da9';
+const ATTR_COLOR = ATTR_HEX.map(h => new THREE.Color(h));
+const ATTR_FILL_COLOR = ATTR_FILL_HEX.map(h => new THREE.Color(h));
+const ATTR_BRIGHT_COLOR = ATTR_BRIGHT_HEX.map(h => new THREE.Color(h));
+const REGION_ATTR = [0, 2, 1, 3, 4];
+const BEATS = [1, 4, 3, 0, 2];
+const CAMP_NAME = ['我方', '敌方'];
+const CAMP_HEX = ['#4fd1e8', '#f06b6b'];
+
+/* ---------------- 棋盘几何 ---------------- */
+function vertex(e, scale = 1) {
+  const a = -Math.PI / 2 + e * SECTOR;
+  return { x: Math.cos(a) * R_OUT * scale, z: Math.sin(a) * R_OUT * scale };
+}
+
+class Cell {
+  constructor(id, region, ring, idx, x, z, attr) {
+    this.id = id; this.region = region; this.ring = ring; this.idx = idx;
+    this.x = x; this.z = z; this.attr = attr; this.baseAttr = attr; this.neighbors = [];
+  }
+  get label() {
+    if (this.ring === 1) return '中心';
+    return `${ATTR_NAME[REGION_ATTR[this.region]]}区·${this.ring}环·${this.idx + 1}`;
+  }
+}
+
+function buildCells() {
+  const list = [new Cell(0, -1, 1, 0, 0, 0, null)];
+  for (let e = 0; e < 5; e++) {
+    const a = vertex(e), b = vertex(e + 1);
+    for (let s = 1; s <= 4; s++) {
+      const f = s / 4;
+      for (let k = 0; k < s; k++) {
+        const t = (s - k) / s;
+        const x = f * ((1 - t) * a.x + t * b.x);
+        const z = f * ((1 - t) * a.z + t * b.z);
+        list.push(new Cell(list.length, e, s + 1, k, x, z, REGION_ATTR[e]));
+      }
+    }
+  }
+  for (let i = 0; i < list.length; i++) {
+    for (let j = i + 1; j < list.length; j++) {
+      const d = Math.hypot(list[i].x - list[j].x, list[i].z - list[j].z);
+      if (d <= NEIGHBOR_DIST) {
+        list[i].neighbors.push(j);
+        list[j].neighbors.push(i);
+      }
+    }
+  }
+  return list;
+}
+
+const cells = buildCells();
+
+const cellDist = cells.map(start => {
+  const d = new Array(cells.length).fill(Infinity);
+  d[start.id] = 0;
+  const q = [start.id];
+  for (let h = 0; h < q.length; h++) {
+    const id = q[h];
+    for (const nb of cells[id].neighbors) {
+      if (d[nb] === Infinity) { d[nb] = d[id] + 1; q.push(nb); }
+    }
+  }
+  return d;
+});
+const stepDist = (a, b) => cellDist[a.id][b.id];
+const geoDist = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
+
+function unitCells(u) {
+  return u && Array.isArray(u.cells) && u.cells.length ? u.cells : (u && u.cell ? [u.cell] : []);
+}
+
+function unitGap(a, b) {
+  const ac = unitCells(a);
+  const bc = unitCells(b);
+  let best = Infinity;
+  for (const ca of ac) for (const cb of bc) {
+    const d = stepDist(ca, cb);
+    if (d < best) best = d;
+  }
+  return best;
+}
+
+function unitOccupiesCell(u, cell) {
+  return !!u && u.alive && unitCells(u).some(c => c.id === cell.id);
+}
+
+function bossClosestCell(boss, fromCell) {
+  let best = boss.cell;
+  let bestD = Infinity;
+  for (const c of unitCells(boss)) {
+    const d = stepDist(fromCell, c);
+    if (d < bestD) { bestD = d; best = c; }
+  }
+  return best;
+}
+
+/* ---------------- 战斗状态 ---------------- */
+const STATUS_DEFS = {
+  normal: { key: 'normal', name: '正常', blocksDecision: false, color: '#8fb0d8' },
+  weak: {
+    key: 'weak', name: '无力', blocksDecision: true, color: '#b79df0',
+    onApply: u => u
+  },
+};
+
+class UnitStatus {
+  constructor(key = 'normal', turns = 0) { this.key = key; this.turns = turns; }
+  get def() { return STATUS_DEFS[this.key] || STATUS_DEFS.normal; }
+  get name() { return this.def.name; }
+  get blocksDecision() { return !!this.def.blocksDecision; }
+  get isNormal() { return this.key === 'normal'; }
+  apply(key, turns, unit) {
+    this.key = STATUS_DEFS[key] ? key : 'normal';
+    this.turns = Math.max(0, turns | 0);
+    this.def.onApply?.(unit);
+  }
+  tick(unit) {
+    if (this.isNormal) return;
+    this.turns = Math.max(0, this.turns - 1);
+    if (this.turns === 0) {
+      this.def.onExpire?.(unit);
+      this.key = 'normal';
+    }
+  }
+}
+
+/* ---------------- 技能表 ---------------- */
+const SKILL_TYPES = {
+  attack: { name: '攻击', color: '#e46b6b' },
+  defend: { name: '防御', color: '#5fa8d8' },
+  dodge: { name: '闪避', color: '#5fc7a8' },
+  move: { name: '移动', color: '#7fc8a8' },
+  spell: { name: '法术', color: '#a98cf0' },
+  recover: { name: '回元', color: '#e0b25c' },
+  rest: { name: '休息', color: '#8b9bb4' },
+};
+const SKILL_TYPE_ORDER = ['attack', 'defend', 'dodge', 'move', 'spell', 'recover', 'rest'];
+
+const SKILLS = [
+  { id: 0, name: '普通攻击', type: 'attack', method: 'attack', cost: { mana: 1 }, target: 'enemy', params: { power: 'atk', range: 'atkRange' }, desc: '造成「攻击力 + 克制」点伤害。目标防御时先减去其防御力，再使其防御力 -1 并被击退。' },
+  { id: 1, name: '普通防御', type: 'defend', method: 'defend', cost: {}, target: 'none', params: {}, desc: '被动。被攻击时按防御力减伤、防御力 -1、并被击退一格；本回合没人打你就空过。' },
+  { id: 2, name: '普通闪避', type: 'dodge', method: 'dodge', cost: { sta: 1 }, target: 'cell', params: { move: 2, reactionCost: 1 }, desc: '移动到 2 格内的落点，移动消耗 1 点体力；被攻击时每次闪避再消耗 1 点体力。' },
+  { id: 3, name: '普通法术', type: 'spell', method: 'convertCell', cost: { mana: 1 }, target: 'cell', params: {}, desc: '把一个格子的主属性改成自己的主属性，可指向中心格。' },
+  { id: 4, name: '普通回元', type: 'recover', method: 'recoverMana', cost: {}, target: 'none', params: { mana: 2 }, desc: '恢复 2 点魔力（不超过上限）。' },
+  { id: 5, name: '普通休息', type: 'rest', method: 'rest', cost: {}, target: 'none', params: { sta: 1 }, desc: '恢复 1 点体力（不超过上限）。' },
+  { id: 6, name: '破锋', type: 'attack', method: 'attack', cost: { mana: 2 }, target: 'enemy', params: { power: 'atk', convertCell: 'target' }, desc: '造成「攻击力 + 克制」点伤害，并把目标所在格改成自己的主属性。' },
+  { id: 7, name: '裂阵', type: 'attack', method: 'attack', cost: { mana: 4 }, target: 'enemy', params: { power: 'atk', convertAround: 'target' }, desc: '造成「攻击力 + 克制」点伤害，并把目标周围一圈的格子改成自己的主属性。' },
+  { id: 8, name: '反戈', type: 'defend', method: 'defend', cost: {}, target: 'none', params: { retaliate: 1 }, desc: '正常防御之后，对攻击来源造成 1 点伤害。' },
+  { id: 9, name: '敛锋', type: 'defend', method: 'defend', cost: { mana: 1 }, target: 'none', params: { restoreDef: 1 }, desc: '正常防御之后，消耗 1 点魔力，恢复 1 点防御力。' },
+  { id: 10, name: '踏云', type: 'dodge', method: 'dodge', cost: { sta: 2 }, target: 'cell', params: { move: 3, reactionCost: 1 }, desc: '可移动到 3 格内的落点，移动消耗 2 点体力；被攻击时每次闪避再消耗 1 点体力。' },
+  { id: 11, name: '无痕', type: 'dodge', method: 'dodge', cost: { mana: 3 }, target: 'cell', params: { move: 2, reactionCost: 0 }, desc: '可移动到 2 格内的落点；本次及后续闪避都不消耗体力。' },
+  { id: 12, name: '淬锋', type: 'spell', method: 'buffAtk', cost: { mana: 2 }, target: 'none', params: { atk: 1 }, desc: '自身攻击力 +1（影响所有攻击）。' },
+  { id: 13, name: '失神', type: 'spell', method: 'applyStatus', cost: { mana: 3 }, target: 'enemy', params: { status: 'weak', turns: 1 }, desc: '使一个敌人进入「无力」1 回合：下一回合无法决策。' },
+  { id: 14, name: '引灵', type: 'recover', method: 'recoverManaAlly', cost: {}, target: 'ally', params: { mana: 1 }, desc: '自身与一名队友各恢复 1 点魔力。' },
+  { id: 15, name: '调息', type: 'rest', method: 'rest', cost: {}, target: 'none', params: { sta: 1, bonusIfNoDamage: 1 }, desc: '恢复 1 点体力；结算前未受伤则额外再 +1。' },
+  { id: 16, name: '普通移动', type: 'move', method: 'move', cost: {}, target: 'cell', params: { move: 1 }, desc: '移动到相邻格（1 步），不消耗资源。' },
+  { id: 17, name: '法术治疗', type: 'spell', method: 'healStamina', cost: { mana: 1 }, target: 'ally', includeSelf: true, params: { sta: 1 }, desc: '选择一名队友回复 1 点体力（可以选择自己）。' },
+  { id: 18, name: '本命一击', type: 'attack', method: 'attributeAttack', cost: { mana: 3 }, target: 'enemy', desc: '属性克制或格子克制满足任意一种时，造成攻击力×3 的伤害；否则不造成伤害。' },
+  { id: 19, name: '炼兵', type: 'spell', method: 'alchemy', cost: { mana: 1 }, target: 'none', element: 0, dynamicCost: 'plus', desc: '本场战斗攻击力 +1；每使用一次，下一次使用魔耗 +1。' },
+  { id: 20, name: '修养', type: 'spell', method: 'nourish', cost: { mana: 3 }, target: 'none', element: 1, dynamicCost: 'plus', desc: '回满血量与体力，并把防御恢复到战斗前；每使用一次，下一次使用魔耗 +1。' },
+  { id: 21, name: '涌动', type: 'attack', method: 'surge', cost: { mana: 3 }, target: 'enemy', element: 2, dynamicCost: 'plus', desc: '攻击距离内单体：消耗目标全部魔力，并造成等量伤害；每使用一次，下一次使用魔耗 +1。' },
+  { id: 22, name: '爆炎', type: 'attack', method: 'blaze', cost: { mana: 2 }, target: 'enemy', element: 3, dynamicCost: 'double', desc: '攻击距离内单体：造成攻击力×3 的伤害；每使用一次，下一次使用魔耗翻倍。' },
+  { id: 23, name: '起甲', type: 'defend', method: 'defend', cost: {}, target: 'none', element: 4, onceBattle: true, desc: '防御姿态。主角被攻击时触发（每场一次）：本回合免疫所有伤害，并提升 2 点攻击力；战斗结束恢复攻击力。' },
+  { id: 24, name: '御金', type: 'defend', method: 'defend', cost: {}, target: 'none', params: { taunt: true }, desc: '嘲讽：对手攻击范围内有自己时只能攻击自己；本回合首次被攻击时护甲 +1。' },
+  { id: 25, name: '铸甲', type: 'spell', method: 'castArmor', cost: { mana: 2 }, target: 'none', desc: '本场战斗中全队防御力 +1。' },
+  { id: 26, name: '生机', type: 'attack', method: 'vitality', cost: { mana: 2 }, target: 'enemy', desc: '造成 floor(施法者攻击力/2) 的伤害，命中后为主角回复等量生命。' },
+  { id: 27, name: '自然', type: 'spell', method: 'nature', cost: { mana: 3 }, target: 'ally', includeSelf: true, desc: '将目标所在格改为其主属性，并回复 floor(施法者攻击力/2) 的生命。' },
+  { id: 28, name: '淡修', type: 'attack', method: 'lightCultivate', cost: { mana: 2 }, target: 'enemy', desc: '造成攻击力伤害，命中后减少目标 floor(施法者攻击力/2) 点魔力。' },
+  { id: 29, name: '潮息', type: 'spell', method: 'tide', cost: { mana: 3 }, target: 'ally', includeSelf: true, desc: '使一名队友本场战斗攻击力 +2。' },
+  { id: 30, name: '灼焰', type: 'attack', method: 'scorch', cost: { mana: 2 }, target: 'enemy', desc: '造成攻击力伤害，命中后目标防御力 -1。' },
+  { id: 31, name: '爆轰', type: 'attack', method: 'blast', cost: { mana: 0 }, target: 'enemy', costAllMana: true, desc: '攻击距离内单体：消耗全部魔力，造成 floor(魔力 × 1.5) 的伤害。' },
+];
+const SKILL_MAP = Object.fromEntries(SKILLS.map(s => [s.id, s]));
+const BASIC_SKILLS = [0, 1, 2, 3, 4, 5, 16, 17];
+const ALL_SKILLS = SKILLS.filter(s => s.id <= 18).map(s => s.id);
+const ELEMENT_SPELL_IDS = { 0: 19, 1: 20, 2: 21, 3: 22, 4: 23 };
+const COMPANION_SKILLS = { shen: [24, 25], qian: [26, 27], nian: [28, 29], chi: [30, 31] };
+
+const CONFIG = {
+  maxRounds: 30,
+  layers: 7,
+  difficulty: { min: 1, max: 10 },
+  luck: { base: 65, perDifficulty: 5, pivot: 40, chancePerPoint: 0.005, min: 0.2, max: 0.85 },
+  player: { hp: 12, atk: 3, def: 3, sta: 4, mana: 4, atkRange: 3 },
+  enemy: { hp: 7, atk: 1, def: 2, sta: 2, mana: 2, atkRange: 2 },
+  scaling: { base: 0.6, difficulty: 0.1, layer: 0.1 },
+  artifact: { longquanLuck: 10, ganjiangAtk: 2, moyeMax: 2, capacity: 10 },
+};
+
+const MAX_ROUNDS = CONFIG.maxRounds;
+
+/* ---------------- 角色 ---------------- */
+class Unit {
+  constructor(id, name, camp, attr, cell, skills, stats, templateId = 1) {
+    this.id = id; this.name = name; this.camp = camp; this.attr = attr;
+    this.templateId = templateId;
+    this.taunt = templateId === 3;
+    this.tauntUsed = false;
+    this.maxHp = stats.hp; this.hp = stats.hp;
+    this.baseMaxHp = stats.hp; this.permMaxHp = 0;
+    this.baseAtk = stats.atk; this.baseDef = stats.def; this.baseMaxSta = stats.sta; this.baseMaxMana = stats.mana;
+    this.permAtk = 0; this.permDef = 0; this.permMaxSta = 0; this.permMaxMana = 0;
+    this.atk = stats.atk; this.def = stats.def; this.maxDef = stats.def;
+    this.atkRange = stats.atkRange;
+    this.maxSta = stats.sta; this.sta = stats.sta;
+    this.maxMana = stats.mana; this.mana = stats.mana;
+    this.cell = cell; this.alive = true;
+    this.skills = skills;
+    this.status = new UnitStatus();
+    this.damageThisRound = 0;
+    this.skipped = false;
+    this.damageImmune = false;
+    this.skillCostUses = {};
+    this.skillOnceUsed = {};
+    this.enterSeq = 0;
+    this.mesh = null; this.target = null;
+  }
+}
+
+function spawnCell(attr) {
+  const region = REGION_ATTR.indexOf(attr);
+  return cells.find(c => c.region === region && c.ring === 5 && c.idx === 0);
+}
+
+let units = [];
+let lastPlayerDamagerId = null;
+const state = {
+  round: 1, phase: 'decision', over: false, onceUsed: false,
+  decisions: {}, currentUnitId: null, winner: null,
+};
+let draft = null;
+let pendingRelic = null;
+let deployment = null;
+
+/* ---------------- Three.js 场景 ---------------- */
+const stage = document.getElementById('stage');
+const bgVideo = document.getElementById('bgVideo');
+bgVideo.poster = encodeURI('/美术资源/背景图/image_generated_20261019_183935_393_0_f985c28b-6763-42f9-bfe4-d7e5a739186e.jpg');
+bgVideo.src = encodeURI('/美术资源/动态背景/video_1792407182426.mp4');
+bgVideo.play().catch(() => {});
+window.addEventListener('pointerdown', () => bgVideo.play().catch(() => {}), { once: true });
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setClearColor(0x000000, 0);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+stage.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = null;
+
+const camera = new THREE.PerspectiveCamera(44, 1, 0.1, 200);
+camera.position.set(0, 9.9, 6.9);
+camera.lookAt(0, 0.9, 1.0);
+
+scene.add(new THREE.HemisphereLight(0xa8c8ff, 0x0a1018, 1.15));
+const keyLight = new THREE.DirectionalLight(0xffffff, 1.5);
+keyLight.position.set(6, 14, 9);
+scene.add(keyLight);
+const rimLight = new THREE.DirectionalLight(0x6f9fff, 0.5);
+rimLight.position.set(-7, 5, -8);
+scene.add(rimLight);
+
+function pentagonShape(radius) {
+  const shape = new THREE.Shape();
+  for (let i = 0; i < 5; i++) {
+    const v = vertex(i, radius / R_OUT);
+    if (i === 0) shape.moveTo(v.x, -v.z);
+    else shape.lineTo(v.x, -v.z);
+  }
+  shape.closePath();
+  return shape;
+}
+
+const plateGeo = new THREE.ShapeGeometry(pentagonShape(R_OUT * 1.075));
+plateGeo.rotateX(-Math.PI / 2);
+const plate = new THREE.Mesh(plateGeo, new THREE.MeshStandardMaterial({
+  color: 0x111a29, roughness: 0.92, metalness: 0.12,
+  transparent: true, opacity: 0.68, depthWrite: false,
+}));
+plate.position.y = -0.09;
+scene.add(plate);
+
+const rimPts = [];
+for (let i = 0; i < 5; i++) {
+  const a = vertex(i), b = vertex((i + 1) % 5);
+  rimPts.push(a.x, 0.004, a.z, b.x, 0.004, b.z);
+}
+const rimGeo = new THREE.BufferGeometry();
+rimGeo.setAttribute('position', new THREE.Float32BufferAttribute(rimPts, 3));
+scene.add(new THREE.LineSegments(rimGeo, new THREE.LineBasicMaterial({
+  color: 0x2f4a6b, transparent: true, opacity: 0.9,
+})));
+
+const linePts = [];
+for (let s = 1; s <= 4; s++) {
+  for (let i = 0; i < 5; i++) {
+    const a = vertex(i, s / 4), b = vertex(i + 1, s / 4);
+    linePts.push(a.x, 0.005, a.z, b.x, 0.005, b.z);
+  }
+}
+for (let i = 0; i < 5; i++) {
+  const v = vertex(i);
+  linePts.push(0, 0.005, 0, v.x, 0.005, v.z);
+}
+const lineGeo = new THREE.BufferGeometry();
+lineGeo.setAttribute('position', new THREE.Float32BufferAttribute(linePts, 3));
+scene.add(new THREE.LineSegments(lineGeo, new THREE.LineBasicMaterial({
+  color: 0x24354d, transparent: true, opacity: 0.85,
+})));
+
+const cellGeo = new THREE.CircleGeometry(0.4, 48);
+cellGeo.rotateX(-Math.PI / 2);
+const cellBorderGeo = new THREE.RingGeometry(0.335, 0.4, 48);
+cellBorderGeo.rotateX(-Math.PI / 2);
+const cellLabelGeo = new THREE.PlaneGeometry(0.54, 0.54);
+cellLabelGeo.rotateX(-Math.PI / 2);
+const cellMeshes = [];
+const cellMats = [];
+const cellBorders = [];
+const cellLabels = [];
+const cellLabelTextures = [];
+const cellLabelCanvases = [];
+
+function drawCellLabel(c) {
+  const cv = cellLabelCanvases[c.id];
+  const tex = cellLabelTextures[c.id];
+  const ctx = cv.getContext('2d');
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  if (c.attr === null) {
+    cellLabels[c.id].visible = false;
+    tex.needsUpdate = true;
+    return;
+  }
+  cellLabels[c.id].visible = true;
+  ctx.globalAlpha = 0.65;
+  ctx.fillStyle = ATTR_BRIGHT_HEX[c.attr];
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font = 'italic 84px "STXingkai", "华文行楷", "行楷", "KaiTi", "楷体", serif';
+  ctx.fillText(ATTR_NAME[c.attr], 64, 68);
+  ctx.globalAlpha = 1;
+  tex.needsUpdate = true;
+}
+
+cells.forEach(c => {
+  const fill = c.attr === null ? new THREE.Color(CELL_FILL_NEUTRAL) : ATTR_FILL_COLOR[c.attr].clone();
+  const bright = c.attr === null ? new THREE.Color(CELL_BRIGHT_NEUTRAL) : ATTR_BRIGHT_COLOR[c.attr].clone();
+  const mat = new THREE.MeshStandardMaterial({
+    color: fill.clone(), emissive: fill.clone(), emissiveIntensity: 0.4,
+    roughness: 0.55, metalness: 0.18,
+  });
+  const mesh = new THREE.Mesh(cellGeo, mat);
+  mesh.position.set(c.x, 0.012, c.z);
+  mesh.userData.cellId = c.id;
+  scene.add(mesh);
+  cellMeshes[c.id] = mesh;
+  cellMats[c.id] = mat;
+
+  const border = new THREE.Mesh(cellBorderGeo, new THREE.MeshBasicMaterial({
+    color: bright.clone(), side: THREE.DoubleSide,
+  }));
+  border.position.set(c.x, 0.017, c.z);
+  scene.add(border);
+  cellBorders[c.id] = border;
+
+  const cv = document.createElement('canvas');
+  cv.width = 128; cv.height = 128;
+  const tex = new THREE.CanvasTexture(cv);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const label = new THREE.Mesh(cellLabelGeo, new THREE.MeshBasicMaterial({
+    map: tex, transparent: true, depthWrite: false, side: THREE.DoubleSide,
+  }));
+  label.position.set(c.x, 0.021, c.z);
+  scene.add(label);
+  cellLabels[c.id] = label;
+  cellLabelTextures[c.id] = tex;
+  cellLabelCanvases[c.id] = cv;
+  drawCellLabel(c);
+});
+
+function refreshCellColors() {
+  cells.forEach(c => {
+    const mat = cellMats[c.id];
+    const fill = c.attr === null ? new THREE.Color(CELL_FILL_NEUTRAL) : ATTR_FILL_COLOR[c.attr].clone();
+    const bright = c.attr === null ? new THREE.Color(CELL_BRIGHT_NEUTRAL) : ATTR_BRIGHT_COLOR[c.attr].clone();
+    mat.color.copy(fill);
+    mat.emissive.copy(fill);
+    cellBorders[c.id].material.color.copy(bright);
+    drawCellLabel(c);
+  });
+}
+
+/* ---------------- 角色外观 ---------------- */
+function drawLabel(u, sprite) {
+  const cv = sprite.userData.canvas;
+  const ctx = cv.getContext('2d');
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  ctx.fillStyle = u.alive ? 'rgba(8,14,24,0.82)' : 'rgba(8,14,24,0.4)';
+  const r = 16, w = cv.width - 8, h = 54, x = 4, y = 12;
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = u.status.isNormal ? CAMP_HEX[u.camp] : STATUS_DEFS[u.status.key].color;
+  ctx.globalAlpha = u.alive ? 0.9 : 0.3;
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+
+  ctx.font = '600 30px "Microsoft YaHei", sans-serif';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = u.alive ? '#e8f0fb' : '#7c8a9d';
+  ctx.textAlign = 'left';
+  ctx.fillText(u.name, 22, 41);
+
+  ctx.font = '600 26px "Microsoft YaHei", sans-serif';
+  ctx.fillStyle = u.alive ? ATTR_HEX[u.attr] : '#5c6778';
+  ctx.textAlign = 'right';
+  ctx.fillText(`${Math.max(0, u.hp)}`, cv.width - 20, 41);
+  sprite.userData.texture.needsUpdate = true;
+}
+
+function buildUnitMesh(u) {
+  const group = new THREE.Group();
+  const attrColor = ATTR_COLOR[u.attr];
+  const campColor = new THREE.Color(CAMP_HEX[u.camp]);
+
+  const gem = new THREE.Mesh(
+    new THREE.OctahedronGeometry(0.34, 0),
+    new THREE.MeshStandardMaterial({
+      color: attrColor, emissive: attrColor, emissiveIntensity: 0.55,
+      roughness: 0.3, metalness: 0.45,
+    })
+  );
+  gem.scale.set(1, 0.68, 1);
+  gem.position.y = 0.34;
+  group.add(gem);
+
+  const edges = new THREE.LineSegments(
+    new THREE.EdgesGeometry(gem.geometry),
+    new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.45 })
+  );
+  edges.scale.copy(gem.scale);
+  edges.position.copy(gem.position);
+  group.add(edges);
+
+  const ring = new THREE.Mesh(
+    new THREE.RingGeometry(0.4, 0.5, 40),
+    new THREE.MeshBasicMaterial({
+      color: campColor, transparent: true, opacity: 0.7, side: THREE.DoubleSide,
+    })
+  );
+  ring.rotation.x = -Math.PI / 2;
+  ring.position.y = 0.022;
+  group.add(ring);
+
+  const cv = document.createElement('canvas');
+  cv.width = 256; cv.height = 80;
+  const tex = new THREE.CanvasTexture(cv);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: tex, transparent: true, depthWrite: false,
+  }));
+  sprite.scale.set(1.42, 0.44, 1);
+  sprite.position.y = 0.96;
+  sprite.userData = { canvas: cv, texture: tex };
+  group.add(sprite);
+  drawLabel(u, sprite);
+
+  gem.userData.unitId = u.id;
+  gem.userData.partCellId = u.cell.id;
+  group.userData.gem = gem;
+  if (u.isBoss && Array.isArray(u.cells)) {
+    group.userData.gems = [gem];
+    for (const pc of u.cells) {
+      if (pc.id === u.cell.id) continue;
+      const partGem = gem.clone();
+      partGem.position.set(pc.x - u.cell.x, 0.34, pc.z - u.cell.z);
+      partGem.userData = { unitId: u.id, partCellId: pc.id };
+      group.add(partGem);
+      group.userData.gems.push(partGem);
+      const partRing = new THREE.Mesh(
+        new THREE.RingGeometry(0.4, 0.5, 40),
+        new THREE.MeshBasicMaterial({
+          color: campColor, transparent: true, opacity: 0.55, side: THREE.DoubleSide,
+        })
+      );
+      partRing.rotation.x = -Math.PI / 2;
+      partRing.position.set(pc.x - u.cell.x, 0.022, pc.z - u.cell.z);
+      group.add(partRing);
+    }
+  }
+  return group;
+}
+
+let enterSeqCounter = 0;
+const STACK_SCALES = [1, 0.8, 0.6, 0.4];
+
+function moveUnit(u, cell) {
+  u.cell = cell;
+  u.enterSeq = ++enterSeqCounter;
+  layoutUnits();
+}
+
+function layoutUnits() {
+  const groups = new Map();
+  units.forEach(u => {
+    if (!u.alive) return;
+    const key = u.cell.id;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(u);
+  });
+  for (const [key, arr] of groups) {
+    const c = cells[key];
+    arr.sort((a, b) => a.enterSeq - b.enterSeq);
+    arr.forEach((u, i) => {
+      u.target = new THREE.Vector3(c.x, i * 0.62, c.z);
+      u.stackScale = STACK_SCALES[Math.min(i, STACK_SCALES.length - 1)];
+      if (u.mesh) u.mesh.scale.setScalar(u.stackScale);
+      if (u.instant) {
+        u.mesh.position.copy(u.target);
+        u.instant = false;
+      }
+    });
+  }
+}
+
+/* ---------------- 界面 ---------------- */
+const phaseInfo = document.getElementById('phaseInfo');
+const orderList = document.getElementById('orderList');
+const hintEl = document.getElementById('hint');
+const logEl = document.getElementById('log');
+const unitBar = document.getElementById('unitBar');
+const banner = document.getElementById('banner');
+const bannerTitle = document.getElementById('bannerTitle');
+const bannerSub = document.getElementById('bannerSub');
+const bannerBtn = document.getElementById('bannerBtn');
+const restartBtn = document.getElementById('restartBtn');
+const shutdownBtn = document.getElementById('shutdownBtn');
+const spUnit = document.getElementById('spUnit');
+const spNote = document.getElementById('spNote');
+const spBody = document.getElementById('spBody');
+const skillPanel = document.getElementById('skillPanel');
+const draftInfo = document.getElementById('draftInfo');
+const confirmBtn = document.getElementById('confirmBtn');
+const cardEl = document.getElementById('skillCard');
+const scCat = document.getElementById('scCat');
+const scName = document.getElementById('scName');
+const scCost = document.getElementById('scCost');
+const scDesc = document.getElementById('scDesc');
+let serverDown = false;
+let hoverSkillId = null;
+let lastSkill = null;
+
+const dossierEl = document.getElementById('unitDossier');
+const dossierImg = document.getElementById('dossierImg');
+const dossierName = document.getElementById('dossierName');
+const dossierTags = document.getElementById('dossierTags');
+const dossierStats = document.getElementById('dossierStats');
+const dossierIntro = document.getElementById('dossierIntro');
+const dossierClose = document.getElementById('dossierClose');
+const victoryCinematic = document.getElementById('victoryCinematic');
+const victoryVideo = document.getElementById('victoryVideo');
+const victoryVideoBackdrop = document.getElementById('victoryVideoBackdrop');
+const winPrompt = document.getElementById('winPrompt');
+const winPromptImg = document.getElementById('winPromptImg');
+winPromptImg.src = encodeURI('/美术资源/UI/image_win.png');
+let dossierUnitId = null;
+
+const PORTRAIT_ENEMY = '/美术资源/角色图/image_warrior.jpg';
+const PORTRAIT_BOSS = '/美术资源/角色图/image_boss.jpg';
+const PORTRAIT_BY_CHAR = {
+  hero: '/美术资源/角色图/image_主角.png',
+  shen: '/美术资源/角色图/image_沈桐桐.png',
+  qian: '/美术资源/角色图/image_芊儿.jpg',
+  nian: '/美术资源/角色图/image_念乔.png',
+  chi: '/美术资源/角色图/image_赤遥.jpg',
+};
+const SWORD_IMAGES = {
+  longquan: '/美术资源/名剑/image_龙泉.png',
+  taie: '/美术资源/名剑/image_太阿.png',
+  ganjiang: '/美术资源/名剑/image_干将.jpg',
+  moye: '/美术资源/名剑/image_莫邪.png',
+};
+const SETTLEMENT_VIDEO_BY_CHAR = {
+  hero: '/美术资源/结算动画/video_主角.mp4',
+  shen: '/美术资源/结算动画/video_沈桐桐.mp4',
+  qian: '/美术资源/结算动画/video_芊儿.mp4',
+  nian: '/美术资源/结算动画/video_念乔.mp4',
+  chi: '/美术资源/结算动画/video_赤遥.mp4',
+};
+const BOSS_WIN_VIDEO = '/美术资源/结算动画/bosswin.mp4';
+const STAT_ICONS = {
+  hp: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1.1 1.1L12 21.2l7.7-7.7 1.1-1.1a5.5 5.5 0 0 0 0-7.8z"/></svg>`,
+  atk: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 3.5h6v6L11 19l-6-6 9.5-9.5z"/><path d="m5 13-2 6 6-2"/><path d="m13 5 6 6"/></svg>`,
+  def: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 20 6v6c0 5-3.4 8.2-8 9-4.6-.8-8-4-8-9V6l8-3z"/></svg>`,
+  sta: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8z"/></svg>`,
+  mana: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.5s6 7 6 11.5a6 6 0 0 1-12 0C6 9.5 12 2.5 12 2.5z"/></svg>`,
+  range: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>`,
+};
+
+function portraitOf(u) {
+  if (u.charId && PORTRAIT_BY_CHAR[u.charId]) return PORTRAIT_BY_CHAR[u.charId];
+  return u.isBoss ? PORTRAIT_BOSS : PORTRAIT_ENEMY;
+}
+
+function statCell(icon, label, value, color) {
+  return `<div class="ds-stat"><span class="ds-ico" style="color:${color}">${icon}</span><span>${label}</span><b>${value}</b></div>`;
+}
+
+function renderDossier() {
+  if (dossierUnitId === null) return;
+  const u = units.find(x => x.id === dossierUnitId);
+  if (!u) { hideDossier(); return; }
+  const hp = Math.max(0, u.hp);
+  dossierImg.src = encodeURI(portraitOf(u));
+  dossierImg.alt = `${u.name} 立绘`;
+  dossierName.textContent = u.name;
+  const tags = [
+    `<span class="tag attr" style="--attr:${ATTR_HEX[u.attr]}">${ATTR_NAME[u.attr]}</span>`,
+    `<span class="tag camp" style="--camp:${CAMP_HEX[u.camp]}">${CAMP_NAME[u.camp]}</span>`,
+  ];
+  if (!u.alive) tags.push('<span class="tag status">已倒下</span>');
+  else if (!u.status.isNormal) tags.push(`<span class="tag status">${u.status.name}</span>`);
+  if (u.isBoss) tags.push(`<span class="tag">部位 ${u.bossParts.filter(p => p.hit).length}/${u.bossParts.length}</span>`);
+  dossierTags.innerHTML = tags.join('');
+  dossierStats.innerHTML = [
+    statCell(STAT_ICONS.hp, '生命', `${hp} / ${u.maxHp}`, '#b4533f'),
+    statCell(STAT_ICONS.atk, '攻击', u.atk, '#a86a1f'),
+    statCell(STAT_ICONS.def, '防御', u.def, '#3f7ea8'),
+    statCell(STAT_ICONS.sta, '体力', `${u.sta} / ${u.maxSta}`, '#3f8a68'),
+    statCell(STAT_ICONS.mana, '魔力', `${u.mana} / ${u.maxMana}`, '#7b5fc0'),
+    statCell(STAT_ICONS.range, '距离', u.atkRange, '#6b7280'),
+  ].join('');
+  dossierIntro.textContent = unitIntro(u);
+  dossierEl.classList.add('show');
+  dossierEl.setAttribute('aria-hidden', 'false');
+}
+
+function showDossier(u) {
+  dossierUnitId = u.id;
+  renderDossier();
+  unitBar.querySelectorAll('.card').forEach(c => {
+    c.classList.toggle('dossier-active', Number(c.dataset.unitId) === u.id);
+  });
+}
+
+function hideDossier() {
+  dossierUnitId = null;
+  dossierEl.classList.remove('show');
+  dossierEl.setAttribute('aria-hidden', 'true');
+  unitBar.querySelectorAll('.card.dossier-active').forEach(c => c.classList.remove('dossier-active'));
+}
+
+dossierClose.addEventListener('click', hideDossier);
+
+function log(text, cls = '') {
+  const div = document.createElement('div');
+  div.className = 'log-item ' + cls;
+  div.innerHTML = text;
+  logEl.appendChild(div);
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+const name = u => `<b>${u.name}</b>`;
+
+let toastTimer = null;
+function showToast(text) {
+  toastEl.textContent = text;
+  toastEl.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toastEl.classList.remove('show'), 2400);
+}
+
+function notifyArtifact(text) {
+  log(text, 'spell');
+  showToast(text);
+}
+const aliveUnits = () => units.filter(u => u.alive);
+const currentActor = () => units.find(u => u.id === state.currentUnitId) || null;
+
+function skillCost(u, s) {
+  if (s.costAllMana) return { mana: u.mana, allMana: true };
+  const manaBase = s.cost.mana || 0;
+  let mana = manaBase;
+  if (s.dynamicCost === 'plus') mana = manaBase + (u.skillCostUses[s.id] || 0);
+  else if (s.dynamicCost === 'double') mana = manaBase * Math.pow(2, u.skillCostUses[s.id] || 0);
+  return { mana, sta: s.cost.sta || 0 };
+}
+
+function skillCostText(u, s) {
+  if (s.costAllMana) return '全部魔力';
+  return costText(skillCost(u, s));
+}
+
+function affordable(u, s) {
+  const c = skillCost(u, s);
+  return (c.mana || 0) <= u.mana && (c.sta || 0) <= u.sta;
+}
+
+function paySkillCost(u, s) {
+  const c = skillCost(u, s);
+  payCost(u, c);
+  if (s.dynamicCost) u.skillCostUses[s.id] = (u.skillCostUses[s.id] || 0) + 1;
+  if (s.onceBattle) u.skillOnceUsed[s.id] = true;
+  return c;
+}
+
+function validTargets(actor, s) {
+  if (s.target === 'enemy') {
+    const list = units.filter(u => u.alive && u.camp !== actor.camp);
+    if (s.type === 'attack') {
+      const inRange = list.filter(u => unitGap(actor, u) <= actor.atkRange);
+      const taunts = inRange.filter(u => u.taunt);
+      return taunts.length ? taunts : inRange;
+    }
+    return list;
+  }
+  if (s.target === 'ally') {
+    return units.filter(u => u.alive && u.camp === actor.camp && (s.includeSelf || u.id !== actor.id));
+  }
+  return [];
+}
+
+function validCells(actor, s) {
+  if (s.target !== 'cell') return [];
+  if (s.type === 'dodge' || s.type === 'move') {
+    const r = s.params.move;
+    return cells.filter(c => {
+      const d = stepDist(actor.cell, c);
+      return d >= 1 && d <= r;
+    });
+  }
+  return cells.slice();
+}
+
+function decisionText(u) {
+  if (!u.alive) return '已倒下';
+  if (u.skipped) return '无力，本回合无法行动';
+  const d = state.decisions[u.id];
+  if (!d) return state.phase === 'decision' ? '等待决策…' : '未决策';
+  const act = d.action ? ENEMY_ACTIONS[d.action] : null;
+  const s = d.skillId !== undefined ? SKILL_MAP[d.skillId] : null;
+  let t = act ? act.name : (s ? s.name : '—');
+  if (Array.isArray(d.targetUnitIds)) t += ` → ${d.targetUnitIds.map(id => units[id] ? units[id].name : id).join('、')}`;
+  if (d.targetUnitId !== undefined) t += ` → ${units[d.targetUnitId].name}`;
+  if (d.targetPartCellId !== undefined) t += `（${cells[d.targetPartCellId].label}）`;
+  if (d.targetCellId !== undefined) t += ` → ${cells[d.targetCellId].label}`;
+  return t;
+}
+
+function costText(cost) {
+  const parts = [];
+  if (cost.mana) parts.push(`${cost.mana} 魔`);
+  if (cost.sta) parts.push(`${cost.sta} 体`);
+  return parts.join(' + ') || '—';
+}
+
+function renderUnitBar() {
+  unitBar.innerHTML = '';
+  for (const u of units) {
+    const card = document.createElement('div');
+    let cls = 'card';
+    if (!u.alive) cls += ' dead';
+    if (u.id === state.currentUnitId) cls += ' current';
+    if (!u.status.isNormal) cls += ' weak';
+    if (u.id === dossierUnitId) cls += ' dossier-active';
+    card.className = cls;
+    card.dataset.unitId = u.id;
+    card.onclick = () => { if (dossierUnitId === u.id) hideDossier(); else showDossier(u); };
+    card.style.setProperty('--camp', CAMP_HEX[u.camp]);
+    card.style.setProperty('--attr', ATTR_HEX[u.attr]);
+    const pct = Math.max(0, u.hp) / u.maxHp * 100;
+    card.innerHTML = `
+      <div class="card-top">
+        <span class="nm">${u.name}</span>
+        <span class="tag attr">${ATTR_NAME[u.attr]}</span>
+        <span class="tag camp">${CAMP_NAME[u.camp]}</span>
+        ${u.isBoss ? `<span class="tag">部位 ${u.bossParts.filter(p => p.hit).length}/${u.bossParts.length}</span>` : ''}
+        ${u.status.isNormal ? '' : `<span class="tag status">${u.status.name}</span>`}
+      </div>
+      <div class="hpbar"><i style="width:${pct}%"></i><b>${Math.max(0, u.hp)} / ${u.maxHp}</b></div>
+      <div class="stats"><span>攻 ${u.atk}</span><span>防 ${u.def}</span><span>体 ${u.sta}/${u.maxSta}</span><span>魔 ${u.mana}/${u.maxMana}</span><span>距 ${u.atkRange}</span></div>
+      <div class="dec">行动：<b>${decisionText(u)}</b></div>
+      ${unitIntro(u) ? `<div class="intro">${unitIntro(u)}</div>` : ''}`;
+    unitBar.appendChild(card);
+  }
+  if (dossierUnitId !== null) renderDossier();
+}
+
+function phaseText() {
+  if (state.phase === 'deploy') return '布阵阶段';
+  if (state.over) {
+    if (state.winner === 'draw') return '平局';
+    return state.winner === 0 ? '我方胜利' : '我方战败';
+  }
+  return state.phase === 'decision' ? '决策阶段' : '结算阶段';
+}
+
+function updateTop() {
+  if (!run.active) {
+    phaseInfo.textContent = '等待开始';
+  } else if (run.phase !== 'battle') {
+    phaseInfo.textContent = `肉鸽 · 第 ${run.stageIndex + 1} / ${RUN_LAYERS} 层`;
+  } else {
+    phaseInfo.textContent = `第 ${state.round} / ${MAX_ROUNDS} 回合 · ${phaseText()}`;
+  }
+  runInfo.textContent = run.rogue ? `难度 ${run.rogue.difficulty} · 幸运 ${run.rogue.luck}` : '';
+  const order = units.filter(u => u.alive).sort((a, b) => a.id - b.id);
+  orderList.innerHTML = order.map(u => {
+    let c = 'order-chip';
+    if (u.id === state.currentUnitId) c += ' now';
+    if (u.skipped) c += ' skip';
+    return `<span class="${c}" data-camp="${u.camp}">${u.name}</span>`;
+  }).join('');
+}
+
+function renderSkillPanel() {
+  const actor = currentActor();
+  spBody.innerHTML = '';
+
+  if (serverDown) {
+    spUnit.textContent = '服务已关闭';
+    spNote.textContent = '';
+    spBody.innerHTML = '<div class="sp-empty">本地服务已关闭，可以关闭本页。<br>下次请重新双击「启动游戏.bat」。</div>';
+    return;
+  }
+  if (state.over) {
+    spUnit.textContent = '对局结束';
+    spNote.textContent = '';
+    spBody.innerHTML = `<div class="sp-empty">${phaseText()}，共 ${state.round} 回合。</div>`;
+    return;
+  }
+  if (state.phase === 'resolve') {
+    spUnit.textContent = '结算中';
+    spNote.textContent = actor ? actor.name : '';
+    spBody.innerHTML = '<div class="sp-empty">正在按行动顺序结算，请稍候…</div>';
+    return;
+  }
+  if (state.phase === 'deploy' && deployment) {
+    renderDeployPanel();
+    return;
+  }
+  if (!actor) {
+    spUnit.textContent = '准备中';
+    spNote.textContent = '';
+    return;
+  }
+
+  spUnit.textContent = `${actor.name} · 选择行动`;
+  spNote.textContent = actor.skipped ? '本回合无力' : '';
+
+  if (actor.camp !== 0) {
+    spBody.innerHTML = `<div class="sp-empty">${actor.name} 正在行动…</div>`;
+    return;
+  }
+  if (actor.skipped) {
+    spBody.innerHTML = '<div class="sp-empty">处于「无力」状态，本回合无法决策。</div>';
+    return;
+  }
+
+  const groups = new Map();
+  for (const id of actor.skills) {
+    const s = SKILL_MAP[id];
+    if (!s) continue;
+    if (!groups.has(s.type)) groups.set(s.type, []);
+    groups.get(s.type).push(s);
+  }
+
+  for (const type of SKILL_TYPE_ORDER) {
+    if (!groups.has(type)) continue;
+    const list = groups.get(type);
+    const wrap = document.createElement('div');
+    wrap.className = 'sp-group';
+    wrap.innerHTML = `<div class="sp-cat">${SKILL_TYPES[type].name}</div>`;
+    const grid = document.createElement('div');
+    grid.className = 'sp-list';
+    for (const s of list) {
+      const btn = document.createElement('button');
+      btn.className = 'skill' + (draft && draft.skill.id === s.id ? ' active' : '');
+      btn.dataset.id = s.id;
+      let ok = affordable(actor, s);
+      if (ok && s.onceBattle && actor.skillOnceUsed[s.id]) ok = false;
+      if (ok && s.target === 'enemy') ok = validTargets(actor, s).length > 0;
+      if (ok && s.target === 'ally') ok = validTargets(actor, s).length > 0;
+      if (ok && (s.type === 'dodge' || s.type === 'move')) ok = validCells(actor, s).length > 0;
+      btn.disabled = !ok;
+      const costLabel = s.onceBattle && actor.skillOnceUsed[s.id] ? '本场已用' : skillCostText(actor, s);
+      btn.innerHTML = `<span>${s.name}</span><small>${costLabel}</small>`;
+      grid.appendChild(btn);
+    }
+      wrap.appendChild(grid);
+      spBody.appendChild(wrap);
+  }
+
+  const onceList = run.artifacts.filter(a => ARTIFACTS[a.id].kind === 'once' && a.count > 0);
+  if (onceList.length) {
+    const wrap = document.createElement('div');
+    wrap.className = 'sp-group';
+    wrap.innerHTML = '<div class="sp-cat">单次藏品</div>';
+    const grid = document.createElement('div');
+    grid.className = 'sp-list';
+    for (const inst of onceList) {
+      const a = ARTIFACTS[inst.id];
+      const btn = document.createElement('button');
+      btn.className = 'skill';
+      btn.dataset.relic = inst.id;
+      btn.disabled = !(actor.camp === 0 && !state.onceUsed);
+      btn.innerHTML = `<span>${a.name}</span><small>×${inst.count}</small>`;
+      grid.appendChild(btn);
+    }
+    wrap.appendChild(grid);
+    spBody.appendChild(wrap);
+  }
+}
+
+function renderDeployPanel() {
+  const cur = deployUnit();
+  spUnit.textContent = '布阵 · 选择站位';
+  spNote.textContent = deployReady() ? '全员已就位' : `${deployment.index + 1} / ${deployment.order.length}`;
+  spBody.innerHTML = '';
+  const list = document.createElement('div');
+  list.className = 'deploy-list';
+  deployment.order.forEach((u, i) => {
+    const status = i < deployment.index ? '已就位' : (u === cur ? '选位中' : '待选');
+    const row = document.createElement('button');
+    row.className = 'deploy-row' + (u === cur ? ' current' : '');
+    row.style.setProperty('--attr', ATTR_HEX[u.attr]);
+    row.innerHTML = `<span class="dn">${u.name}</span>
+      <span class="da">${ATTR_NAME[u.attr]}</span>
+      <span class="dc">${u.cell.label} · ${status}</span>`;
+    row.onclick = () => selectDeployUnit(u);
+    list.appendChild(row);
+  });
+  spBody.appendChild(list);
+  const tip = document.createElement('div');
+  tip.className = 'sp-empty deploy-tip';
+  tip.innerHTML = cur
+    ? `点击棋盘上的高亮格，放置 <b>${cur.name}</b>。点击列表中的队友可重新选位。`
+    : '全员已就位，点击下方「开始战斗」。';
+  spBody.appendChild(tip);
+  const actions = document.createElement('div');
+  actions.className = 'deploy-actions';
+  const back = document.createElement('button');
+  back.textContent = '上一步';
+  back.disabled = deployment.index <= 0;
+  back.onclick = () => {
+    deployment.index = Math.max(0, deployment.index - 1);
+    updateAll();
+  };
+  const reset = document.createElement('button');
+  reset.textContent = '默认站位';
+  reset.onclick = () => resetDeployment();
+  actions.append(back, reset);
+  spBody.appendChild(actions);
+}
+
+function updateHint() {
+  if (serverDown) {
+    hintEl.textContent = '本地服务已关闭，可以关闭本页';
+    return;
+  }
+  if (state.over) {
+    hintEl.textContent = '对局结束，点「重新开始」再来一局';
+    return;
+  }
+  if (state.phase === 'resolve') {
+    const a = currentActor();
+    hintEl.textContent = `结算中：${a ? a.name : ''}`;
+    return;
+  }
+  if (state.phase === 'deploy' && deployment) {
+    const u = deployUnit();
+    hintEl.textContent = u
+      ? `布阵：点击高亮格，确定 ${u.name} 的起始位置`
+      : '全员已就位，点击「开始战斗」';
+    return;
+  }
+  if (pendingRelic) {
+    const a = ARTIFACTS[pendingRelic.id];
+    hintEl.textContent = a.target === 'ally'
+      ? `请点击一名队友使用【${a.name}】`
+      : `请点击一名敌人使用【${a.name}】`;
+    return;
+  }
+  if (draft) {
+    const s = draft.skill;
+    if (draftReady()) {
+      hintEl.textContent = '确认无误后，点击右侧「确定决策」';
+      return;
+    }
+    hintEl.textContent =
+      s.type === 'attack' ? `请点击攻击距离（${draft.unit.atkRange} 格）内的敌方角色` :
+      s.type === 'dodge' ? `请点击 ${s.params.move} 格内的格子作为闪避落点` :
+      s.type === 'move' ? `请点击 ${s.params.move} 格内的相邻格子移动` :
+      s.target === 'ally' ? (s.includeSelf ? '请点击一名队友或自己' : '请点击一名队友') :
+      '请点击一个格子作为法术目标';
+    return;
+  }
+  const a = currentActor();
+  if (a && a.skipped) hintEl.textContent = `${a.name} 处于无力状态，本回合跳过`;
+  else if (a && a.camp === 0) hintEl.textContent = `轮到 ${a.name} 决策：请在右侧选择技能`;
+  else hintEl.textContent = a ? `${a.name} 行动中…` : '';
+}
+
+function updateHighlights() {
+  const lit = new Set();
+  const hot = new Set();
+  if (state.phase === 'deploy' && deployment) {
+    const cur = deployUnit();
+    if (cur) {
+      deployableCells(cur).forEach(c => lit.add(c.id));
+      hot.add(cur.id);
+    }
+  }
+  if (draft) {
+    const s = draft.skill;
+    if (s.type === 'dodge' || s.type === 'move') validCells(draft.unit, s).forEach(c => lit.add(c.id));
+    else if (s.target === 'cell') cells.forEach(c => lit.add(c.id));
+    if (s.target === 'enemy' || s.target === 'ally') {
+      validTargets(draft.unit, s).forEach(u => hot.add(u.id));
+    }
+  }
+  if (pendingRelic) {
+    const a = ARTIFACTS[pendingRelic.id];
+    units.forEach(u => {
+      if (!u.alive) return;
+      if (a.target === 'ally' && u.camp === 0) hot.add(u.id);
+      if (a.target === 'enemy' && u.camp === 1) hot.add(u.id);
+    });
+  }
+  cells.forEach(c => {
+    const on = lit.has(c.id);
+    const k = on ? 1.12 : 1;
+    cellMats[c.id].emissiveIntensity = on ? 1.7 : 0.4;
+    cellMeshes[c.id].scale.setScalar(k);
+    cellBorders[c.id].scale.setScalar(k);
+    cellLabels[c.id].scale.setScalar(k);
+  });
+  units.forEach(u => {
+    if (!u.mesh) return;
+    u.mesh.visible = u.alive;
+    u.mesh.scale.setScalar((u.stackScale || 1) * (hot.has(u.id) ? 1.16 : 1));
+    const sprite = u.mesh.children[3];
+    if (sprite) drawLabel(u, sprite);
+  });
+}
+
+function refreshCard() {
+  const actor = currentActor();
+  let s = null;
+  let who = null;
+  if (draft) { s = draft.skill; who = draft.unit; }
+  else if (hoverSkillId !== null) { s = SKILL_MAP[hoverSkillId]; who = actor; }
+  else if (lastSkill) { s = SKILL_MAP[lastSkill.skillId]; who = units[lastSkill.unitId]; }
+
+  if (!s || state.over || state.phase !== 'decision' || !actor || actor.camp !== 0) {
+    cardEl.classList.add('hidden');
+    return;
+  }
+  scCat.textContent = SKILL_TYPES[s.type].name;
+  scCat.style.color = SKILL_TYPES[s.type].color;
+  scName.textContent = `${who ? who.name + ' · ' : ''}${s.name}`;
+  const c = who ? skillCostText(who, s) : costText(s.cost);
+  scCost.textContent = c === '—' ? '消耗：无' : `消耗：${c}`;
+  scDesc.textContent = s.desc || '';
+  cardEl.classList.remove('hidden');
+}
+
+function updateAll() {
+  updateTop();
+  renderUnitBar();
+  renderSkillPanel();
+  updateFoot();
+  refreshCard();
+  updateHint();
+  updateHighlights();
+}
+
+/* ---------------- 规则 ---------------- */
+function counterBonus() {
+  return 1 + Math.floor((run.stageIndex || 0) / 3);
+}
+
+function modifierParts(att, tgt, attCell = att.cell, tgtCell = tgt.cell) {
+  let m = 0;
+  const parts = [];
+  const c = counterBonus();
+  if (BEATS[att.attr] === tgt.attr) { m += c; parts.push(`属性克制 +${c}`); }
+  else if (BEATS[tgt.attr] === att.attr) { m -= c; parts.push(`属性被克 -${c}`); }
+  if (attCell.attr !== null && tgtCell.attr !== null) {
+    if (BEATS[attCell.attr] === tgtCell.attr) { m += c; parts.push(`格属性克制 +${c}`); }
+    else if (BEATS[tgtCell.attr] === attCell.attr) { m -= c; parts.push(`格属性被克 -${c}`); }
+  }
+  return { m, parts };
+}
+
+function payCost(u, cost) {
+  if (cost.mana) u.mana = Math.max(0, u.mana - cost.mana);
+  if (cost.sta) u.sta = Math.max(0, u.sta - cost.sta);
+}
+
+function applyDamage(u, dmg, source = null) {
+  if (dmg <= 0 || !u.alive) return 0;
+  if (u.damageImmune) {
+    log(`${name(u)} 免疫了 ${dmg} 点伤害`, 'note');
+    return 0;
+  }
+  if (source && source.camp === 0) lastPlayerDamagerId = source.id;
+  u.hp -= dmg;
+  u.damageThisRound += dmg;
+  if (u.hp <= 0) {
+    u.alive = false;
+    log(`${name(u)} 倒下了`, 'dmg');
+  }
+  return dmg;
+}
+
+function setCellAttr(cell, attr) {
+  if (cell.attr === attr) return false;
+  cell.attr = attr;
+  refreshCellColors();
+  return true;
+}
+
+function knockback(u, from) {
+  if (u.isBoss) return;
+  const cur = geoDist(u.cell, from.cell);
+  let maxD = -1;
+  for (const id of u.cell.neighbors) maxD = Math.max(maxD, geoDist(cells[id], from.cell));
+  if (maxD <= cur + 1e-6) {
+    log(`${name(u)} 已无法继续后退，原地不动`, 'note');
+    return;
+  }
+  const pool = u.cell.neighbors
+    .map(id => cells[id])
+    .filter(c => Math.abs(geoDist(c, from.cell) - maxD) < 1e-6)
+    .sort((a, b) => b.ring - a.ring);
+  u.cell = pool[0];
+  u.enterSeq = ++enterSeqCounter;
+  layoutUnits();
+  log(`${name(u)} 被击退到 ${pool[0].label}`, 'move');
+}
+
+function tryDodge(t, tSkill) {
+  const cost = tSkill.params.reactionCost || 0;
+  if (cost > 0 && t.sta < cost) {
+    log(`${name(t)} 体力不足，无法闪避本次攻击`, 'note');
+    return false;
+  }
+  t.sta = Math.max(0, t.sta - cost);
+  log(`${name(t)} 闪避成功${cost ? `，体力 -${cost}` : '（不耗体力）'}`, 'evade');
+  return true;
+}
+
+function isTaunting(u) {
+  if (!u || !u.alive) return false;
+  if (u.taunt) return true;
+  const d = state.decisions[u.id];
+  if (!d) return false;
+  if (d.action === 'taunt') return true;
+  const s = d.skillId !== undefined ? SKILL_MAP[d.skillId] : null;
+  return !!(s && s.params && s.params.taunt);
+}
+
+function tauntInRange(u) {
+  return units.filter(x => x.alive && x.camp !== u.camp && isTaunting(x) && unitGap(u, x) <= u.atkRange);
+}
+
+function forcedTauntTarget(u, target) {
+  const list = tauntInRange(u);
+  if (!list.length) return target;
+  if (target && list.includes(target)) return target;
+  return list.slice().sort((a, b) => (b.def - a.def) || (a.hp - b.hp))[0];
+}
+
+function triggerTauntArmor(t) {
+  if (t.tauntUsed) return false;
+  t.tauntUsed = true;
+  t.def += 1;
+  log(`${name(t)} 嘲讽：护甲 +1（${t.def}）`, '');
+  return true;
+}
+
+function resolveAttackTarget(u, dec, label, cost) {
+  payCost(u, cost);
+  let t = units[dec.targetUnitId];
+  if (!t || !t.alive) { log(`${name(u)} 的${label}失去目标`, 'note'); return null; }
+  if (unitGap(u, t) > u.atkRange) {
+    log(`${name(u)} 的${label}超出攻击距离（${u.atkRange} 格），落空`, 'note');
+    return null;
+  }
+  const forced = forcedTauntTarget(u, t);
+  if (forced !== t) {
+    log(`${name(u)} 被 ${name(forced)} 嘲讽，目标改为它`, 'note');
+    t = forced;
+  }
+  return t;
+}
+
+function attackCellPair(attacker, target, targetPartCellId) {
+  const attCell = attacker.isBoss ? bossClosestCell(attacker, target.cell) : attacker.cell;
+  let tgtCell = target.isBoss ? bossClosestCell(target, attacker.cell) : target.cell;
+  if (target.isBoss && Number.isInteger(targetPartCellId)) {
+    const part = target.cells.find(c => c.id === targetPartCellId);
+    if (part) tgtCell = part;
+  }
+  return { attCell, tgtCell };
+}
+
+function resolveAttackDamage(u, t, opts) {
+  const { attCell, tgtCell } = attackCellPair(u, t, opts.targetPartCellId);
+  const hitCell = tgtCell;
+  const { m, parts } = modifierParts(u, t, attCell, tgtCell);
+  const raw = Math.max(0, opts.power + m);
+  log(`${name(u)} 对 ${name(t)} 使用${opts.label}${parts.length ? `（${parts.join('，')}）` : ''}`, '');
+
+  const td = state.decisions[t.id];
+  const tSkill = td && td.skillId !== undefined ? SKILL_MAP[td.skillId] : null;
+  const taunt = !!(td && td.action === 'taunt') || !!(tSkill && tSkill.params && tSkill.params.taunt);
+  const counter = !!(td && td.action === 'counter');
+  if (taunt) triggerTauntArmor(t);
+  if (tSkill && tSkill.id === 23 && u.camp !== t.camp) triggerArmorUp(t);
+
+  if (!opts.skipDodge && tSkill && tSkill.type === 'dodge' && tryDodge(t, tSkill)) {
+    return false;
+  }
+  if (t.isBoss && u.camp !== t.camp) markBossPartHit(t, tgtCell, u);
+
+  if (taunt || counter || (tSkill && tSkill.type === 'defend')) {
+    const dmg = Math.max(0, raw - (opts.ignoreDef ? 0 : t.def));
+    const dealt = applyDamage(t, dmg, u);
+    t.def = Math.max(0, t.def - 1);
+    log(`${name(t)} 防御，受到 ${dealt} 点伤害，防御力降为 ${t.def}`, 'dmg');
+    if (t.alive && !t.isBoss) knockback(t, u);
+    if (tSkill && tSkill.params && tSkill.params.retaliate && u.alive) {
+      applyDamage(u, tSkill.params.retaliate, t);
+      log(`${name(t)} 反击，对 ${name(u)} 造成 ${tSkill.params.retaliate} 点伤害`, 'dmg');
+    }
+    if (tSkill && tSkill.params && tSkill.params.restoreDef && t.alive) {
+      const manaCost = tSkill.cost.mana || 0;
+      if (t.mana >= manaCost) {
+        t.mana -= manaCost;
+        t.def = Math.min(t.maxDef, t.def + tSkill.params.restoreDef);
+        log(`${name(t)} 消耗 ${manaCost} 魔力，防御力恢复为 ${t.def}`, '');
+      }
+    }
+    if (counter) {
+      if (u.alive) {
+        applyDamage(u, 1, t);
+        log(`${name(t)} 反击，对 ${name(u)} 造成 1 点伤害`, 'dmg');
+      }
+      t.mana = Math.min(t.maxMana, t.mana + 1);
+      log(`${name(t)} 反击回复 1 点魔力（${t.mana}/${t.maxMana}）`, 'spell');
+    }
+  } else {
+    const dealt = applyDamage(t, raw, u);
+    log(`${name(t)} 无有效防御，受到 ${dealt} 点伤害`, 'dmg');
+  }
+
+  if (opts.convertCell === 'target') {
+    if (setCellAttr(hitCell, u.attr)) log(`${hitCell.label} 属性变为 ${ATTR_NAME[u.attr]}`, 'spell');
+  }
+  if (opts.convertAround === 'target') {
+    let n = 0;
+    hitCell.neighbors.forEach(id => { if (setCellAttr(cells[id], u.attr)) n++; });
+    log(`${hitCell.label} 周围 ${n} 个格子属性变为 ${ATTR_NAME[u.attr]}`, 'spell');
+  }
+  opts.onHit?.(t);
+  return true;
+}
+
+function markBossPartHit(boss, cell, source = null) {
+  if (!boss.bossParts) return false;
+  const part = boss.bossParts.find(p => p.cell.id === cell.id);
+  if (!part || part.hit) return false;
+  part.hit = true;
+  part.pending = true;
+  part.sourceId = source ? source.id : undefined;
+  log(`BOSS 的${cell.label}部位首次受击`, 'note');
+  return true;
+}
+
+function bossEndRound(boss) {
+  if (!boss.alive) return;
+  let total = 0;
+  for (const part of boss.bossParts) {
+    if (!part.pending) continue;
+    part.pending = false;
+    const loss = Math.ceil(boss.maxHp / 8);
+    total += loss;
+    log(`BOSS 的${part.cell.label}部位破坏：失去 ${loss} 点血量`, 'dmg');
+    applyDamage(boss, loss, part.sourceId !== undefined ? units[part.sourceId] : null);
+    if (!boss.alive) break;
+  }
+  if (total) log(`BOSS 部位结算：共失去 ${total} 点血量`, 'dmg');
+  if (!boss.alive) return;
+  if (!boss.enraged && boss.hp * 2 < boss.maxHp) {
+    boss.enraged = true;
+    boss.baseAtk = Math.ceil(boss.baseAtk * 1.5);
+    boss.atk = boss.baseAtk + boss.permAtk;
+    log(`BOSS 狂暴：攻击力提升 50%，当前攻击力 ${boss.atk}`, 'round');
+  }
+}
+
+function runAttack(u, dec, s) {
+  const t = resolveAttackTarget(u, dec, s.name, s.cost);
+  if (!t) return;
+  const power = s.params.power === 'atk' ? u.atk : s.params.power;
+  resolveAttackDamage(u, t, {
+    label: s.name,
+    power,
+    convertCell: s.params.convertCell,
+    convertAround: s.params.convertAround,
+    targetPartCellId: dec.targetPartCellId,
+  });
+}
+
+function runCorrode(u, dec) {
+  const t = resolveAttackTarget(u, dec, '腐蚀', { mana: 2 });
+  if (!t) return;
+  const td = state.decisions[t.id];
+  const tSkill = td && td.skillId !== undefined ? SKILL_MAP[td.skillId] : null;
+  if (td && td.action === 'taunt') triggerTauntArmor(t);
+  if (tSkill && tSkill.type === 'dodge' && tryDodge(t, tSkill)) return;
+  if (tSkill && tSkill.id === 23) triggerArmorUp(t);
+  if (t.def > 0) {
+    t.def -= 1;
+    log(`${name(u)} 对 ${name(t)} 使用腐蚀，护甲 -1（剩余 ${t.def}），本击无伤害`, 'dmg');
+    return;
+  }
+  const { m, parts } = modifierParts(u, t);
+  const raw = Math.max(0, u.atk + m);
+  const dealt = applyDamage(t, raw, u);
+  t.sta = Math.max(0, t.sta - 1);
+  log(`${name(u)} 对 ${name(t)} 使用腐蚀${parts.length ? `（${parts.join('，')}）` : ''}，造成 ${dealt} 点伤害，体力 -1（剩余 ${t.sta}）`, 'dmg');
+}
+
+function runTransform(u, dec) {
+  const t = resolveAttackTarget(u, dec, '变换', { mana: 2 });
+  if (!t) return;
+  const td = state.decisions[t.id];
+  const tSkill = td && td.skillId !== undefined ? SKILL_MAP[td.skillId] : null;
+  if (td && td.action === 'taunt') triggerTauntArmor(t);
+  if (tSkill && tSkill.type === 'dodge' && tryDodge(t, tSkill)) return;
+  if (tSkill && tSkill.id === 23) triggerArmorUp(t);
+  const tgtCell = t.isBoss ? bossClosestCell(t, u.cell) : t.cell;
+  const selfBefore = u.cell.attr;
+  const tgtBefore = tgtCell.attr;
+  setCellAttr(u.cell, u.attr);
+  setCellAttr(tgtCell, t.attr);
+  log(`${name(u)} 施放变换：己方格 ${ATTR_NAME[selfBefore] ?? '无'} → ${ATTR_NAME[u.attr]}，${name(t)} 所在格 ${ATTR_NAME[tgtBefore] ?? '无'} → ${ATTR_NAME[t.attr]}`, 'spell');
+  resolveAttackDamage(u, t, {
+    label: '变换',
+    power: u.atk,
+    skipDodge: true,
+    targetPartCellId: t.isBoss ? tgtCell.id : undefined,
+  });
+}
+
+function runDodge(u, dec, s) {
+  payCost(u, s.cost);
+  const c = cells[dec.targetCellId];
+  if (!c || stepDist(u.cell, c) > s.params.move) {
+    log(`${name(u)} 的${s.name}落点无效`, 'note');
+    return;
+  }
+  moveUnit(u, c);
+  log(`${name(u)} 使用${s.name}移动到 ${c.label}`, 'move');
+}
+
+function runMove(u, dec, s) {
+  payCost(u, s.cost);
+  const c = cells[dec.targetCellId];
+  if (!c || stepDist(u.cell, c) > s.params.move) {
+    log(`${name(u)} 的${s.name}落点无效`, 'note');
+    return;
+  }
+  moveUnit(u, c);
+  log(`${name(u)} 移动到 ${c.label}`, 'move');
+}
+
+function runConvertCell(u, dec, s) {
+  payCost(u, s.cost);
+  const c = cells[dec.targetCellId];
+  if (!c) return;
+  setCellAttr(c, u.attr);
+  log(`${name(u)} 施法，${c.label} 属性变为 ${ATTR_NAME[u.attr]}`, 'spell');
+}
+
+function runRecoverMana(u, dec, s) {
+  const before = u.mana;
+  u.mana = Math.min(u.maxMana, u.mana + s.params.mana);
+  log(`${name(u)} 回元，魔力 ${before} → ${u.mana}`, '');
+}
+
+function runRecoverManaAlly(u, dec, s) {
+  const t = units[dec.targetUnitId];
+  if (!t || !t.alive) { log(`${name(u)} 的${s.name}失去目标`, 'note'); return; }
+  const a = u.mana, b = t.mana;
+  u.mana = Math.min(u.maxMana, u.mana + s.params.mana);
+  t.mana = Math.min(t.maxMana, t.mana + s.params.mana);
+  log(`${name(u)} 与 ${name(t)} 各回复 ${s.params.mana} 点魔力（${a}→${u.mana} / ${b}→${t.mana}）`, 'spell');
+}
+
+function runRest(u, dec, s) {
+  const before = u.sta;
+  u.sta = Math.min(u.maxSta, u.sta + (s.params.sta || 0));
+  let extra = 0;
+  if (s.params.bonusIfNoDamage && u.damageThisRound === 0) {
+    extra = s.params.bonusIfNoDamage;
+    u.sta = Math.min(u.maxSta, u.sta + extra);
+  }
+  log(`${name(u)} ${s.name}，体力 ${before} → ${u.sta}${extra ? '（未受伤，额外 +1）' : ''}`, '');
+}
+
+function runBuffAtk(u, dec, s) {
+  payCost(u, s.cost);
+  u.atk += s.params.atk;
+  log(`${name(u)} 施法，攻击力提升至 ${u.atk}`, 'spell');
+}
+
+function runApplyStatus(u, dec, s) {
+  payCost(u, s.cost);
+  const t = units[dec.targetUnitId];
+  if (!t || !t.alive) { log(`${name(u)} 的${s.name}失去目标`, 'note'); return; }
+  t.status.apply(s.params.status, s.params.turns, t);
+  log(`${name(t)} 进入「${t.status.name}」状态（${s.params.turns} 回合）`, 'spell');
+}
+
+function runHealStamina(u, dec, s) {
+  paySkillCost(u, s);
+  const t = units[dec.targetUnitId];
+  if (!t || !t.alive) { log(`${name(u)} 的${s.name}失去目标`, 'note'); return; }
+  const before = t.sta;
+  t.sta = Math.min(t.maxSta, t.sta + (s.params.sta || 1));
+  log(`${name(u)} 对 ${name(t)} 使用${s.name}，体力 ${before} → ${t.sta}`, 'spell');
+}
+
+function runAttributeAttack(u, dec, s) {
+  const t = resolveAttackTarget(u, dec, s.name, s.cost);
+  if (!t) return;
+  const { attCell, tgtCell } = attackCellPair(u, t, dec.targetPartCellId);
+  const attrAdv = BEATS[u.attr] === t.attr;
+  const cellAdv = attCell.attr !== null && tgtCell.attr !== null && BEATS[attCell.attr] === tgtCell.attr;
+  if (!attrAdv && !cellAdv) {
+    log(`${name(u)} 对 ${name(t)} 使用${s.name}，属性与格子均未克制，未造成伤害`, 'note');
+    return;
+  }
+  const reasons = [];
+  if (attrAdv) reasons.push('属性克制');
+  if (cellAdv) reasons.push('格子克制');
+  log(`${name(u)} 的${s.name}满足${reasons.join(' + ')}`, 'spell');
+  resolveAttackDamage(u, t, {
+    label: s.name,
+    power: u.atk * (s.params?.power || 3),
+    targetPartCellId: dec.targetPartCellId,
+  });
+}
+
+function runAlchemy(u, dec, s) {
+  paySkillCost(u, s);
+  u.atk += 1;
+  log(`${name(u)} 使用${s.name}，本场攻击力 +1（当前 ${u.atk}）`, 'spell');
+}
+
+function runNourish(u, dec, s) {
+  paySkillCost(u, s);
+  u.hp = u.maxHp;
+  u.sta = u.maxSta;
+  if (u.battleSnapshot) u.def = u.battleSnapshot.def;
+  log(`${name(u)} 使用${s.name}，血量与体力回满，防御恢复为 ${u.def}`, 'spell');
+}
+
+function runSurge(u, dec, s) {
+  paySkillCost(u, s);
+  const t = resolveAttackTarget(u, dec, s.name, {});
+  if (!t) return;
+  const amount = t.mana;
+  t.mana = 0;
+  applyDamage(t, amount, u);
+  log(`${name(u)} 对 ${name(t)} 使用${s.name}，消耗其全部 ${amount} 点魔力并造成等量伤害`, 'spell');
+}
+
+function runBlaze(u, dec, s) {
+  paySkillCost(u, s);
+  const t = resolveAttackTarget(u, dec, s.name, {});
+  if (!t) return;
+  resolveAttackDamage(u, t, {
+    label: s.name,
+    power: u.atk * 3,
+    targetPartCellId: dec.targetPartCellId,
+  });
+}
+
+function triggerArmorUp(t) {
+  if (t.skillOnceUsed[23]) return false;
+  t.skillOnceUsed[23] = true;
+  t.damageImmune = true;
+  t.atk += 2;
+  log(`${name(t)} 触发【起甲】：本回合免疫所有伤害，攻击力 +2（当前 ${t.atk}）`, 'spell');
+  return true;
+}
+
+function runCastArmor(u, dec, s) {
+  paySkillCost(u, s);
+  for (const p of playerUnits) {
+    if (!p.alive) continue;
+    p.def += 1;
+    p.maxDef += 1;
+  }
+  log(`${name(u)} 使用${s.name}：全队本场防御力 +1`, 'spell');
+}
+
+function runVitality(u, dec, s) {
+  const t = resolveAttackTarget(u, dec, s.name, s.cost);
+  if (!t) return;
+  const amount = Math.floor(u.atk / 2);
+  const hit = resolveAttackDamage(u, t, {
+    label: s.name,
+    power: amount,
+    targetPartCellId: dec.targetPartCellId,
+  });
+  if (!hit) return;
+  const hero = playerUnits[0];
+  if (hero && hero.alive) {
+    const before = hero.hp;
+    hero.hp = Math.min(hero.maxHp, hero.hp + amount);
+    log(`${name(hero)} 因${s.name}回复 ${hero.hp - before} 点生命`, 'spell');
+  }
+}
+
+function runNature(u, dec, s) {
+  paySkillCost(u, s);
+  const t = units[dec.targetUnitId];
+  if (!t || !t.alive) { log(`${name(u)} 的${s.name}失去目标`, 'note'); return; }
+  const changed = setCellAttr(t.cell, t.attr);
+  const amount = Math.floor(u.atk / 2);
+  const before = t.hp;
+  t.hp = Math.min(t.maxHp, t.hp + amount);
+  log(`${name(u)} 对 ${name(t)} 使用${s.name}，${changed ? `${t.cell.label} 属性变为 ${ATTR_NAME[t.attr]}，` : ''}回复 ${t.hp - before} 点生命`, 'spell');
+}
+
+function runLightCultivate(u, dec, s) {
+  const t = resolveAttackTarget(u, dec, s.name, s.cost);
+  if (!t) return;
+  const hit = resolveAttackDamage(u, t, {
+    label: s.name,
+    power: u.atk,
+    targetPartCellId: dec.targetPartCellId,
+  });
+  if (!hit) return;
+  const amount = Math.floor(u.atk / 2);
+  const before = t.mana;
+  t.mana = Math.max(0, t.mana - amount);
+  log(`${name(t)} 因${s.name}失去 ${before - t.mana} 点魔力（剩余 ${t.mana}）`, 'spell');
+}
+
+function runTide(u, dec, s) {
+  paySkillCost(u, s);
+  const t = units[dec.targetUnitId];
+  if (!t || !t.alive) { log(`${name(u)} 的${s.name}失去目标`, 'note'); return; }
+  t.atk += 2;
+  log(`${name(u)} 对 ${name(t)} 使用${s.name}，本场攻击力 +2（当前 ${t.atk}）`, 'spell');
+}
+
+function runScorch(u, dec, s) {
+  const t = resolveAttackTarget(u, dec, s.name, s.cost);
+  if (!t) return;
+  const hit = resolveAttackDamage(u, t, {
+    label: s.name,
+    power: u.atk,
+    targetPartCellId: dec.targetPartCellId,
+  });
+  if (!hit) return;
+  t.def = Math.max(0, t.def - 1);
+  log(`${name(t)} 因${s.name}额外失去 1 点防御（剩余 ${t.def}）`, 'dmg');
+}
+
+function runBlast(u, dec, s) {
+  const mana = u.mana;
+  paySkillCost(u, s);
+  const t = resolveAttackTarget(u, dec, s.name, {});
+  if (!t) return;
+  const amount = Math.floor(mana * 3 / 2);
+  applyDamage(t, amount, u);
+  log(`${name(u)} 对 ${name(t)} 使用${s.name}，消耗全部 ${mana} 点魔力，造成 ${amount} 点伤害`, 'spell');
+}
+
+function runBossWhip(u, dec) {
+  payCost(u, { mana: 2 });
+  const ids = Array.isArray(dec.targetUnitIds) ? dec.targetUnitIds : [];
+  let targets = ids.map(id => units[id]).filter(t => t && t.alive && unitGap(u, t) <= u.atkRange);
+  const taunts = tauntInRange(u);
+  if (taunts.length) targets = [taunts.slice().sort((a, b) => (b.def - a.def) || (a.hp - b.hp))[0]];
+  if (!targets.length) {
+    log(`${name(u)} 的鞭挞没有目标`, 'note');
+    return;
+  }
+  for (const t of targets) {
+    if (!t.alive) continue;
+    resolveAttackDamage(u, t, { label: '鞭挞', power: u.atk });
+  }
+}
+
+function runBossPierce(u, dec) {
+  const t = resolveAttackTarget(u, dec, '穿刺', { mana: 2 });
+  if (!t) return;
+  resolveAttackDamage(u, t, { label: '穿刺', power: u.atk, ignoreDef: true });
+}
+
+function runBossSuppress(u, dec) {
+  payCost(u, { mana: 2 });
+  const t = units[dec.targetUnitId];
+  if (!t || !t.alive) {
+    log(`${name(u)} 的压制失去目标`, 'note');
+    return;
+  }
+  applyDamage(t, 1, u);
+  t.status.apply('weak', 1, t);
+  log(`${name(u)} 压制 ${name(t)}：1 点固定伤害并进入「无力」1 回合`, 'spell');
+}
+
+function runBossBurst(u) {
+  payCost(u, { mana: 2 });
+  let n = 0;
+  for (const c of cells) if (setCellAttr(c, u.attr)) n++;
+  log(`${name(u)} 爆发：${n} 个格子属性变为 ${ATTR_NAME[u.attr]}`, 'spell');
+}
+
+function runBossDrain(u) {
+  let total = 0;
+  for (const p of units) {
+    if (!p.alive || p.camp === u.camp) continue;
+    if (p.mana > 0) { p.mana -= 1; total += 1; }
+  }
+  u.mana = Math.min(u.maxMana, u.mana + total);
+  log(`${name(u)} 抽取：${total} 点魔力被吸取，当前魔力 ${u.mana}/${u.maxMana}`, 'spell');
+}
+
+const METHODS = {
+  attack: runAttack,
+  dodge: runDodge,
+  move: runMove,
+  convertCell: runConvertCell,
+  recoverMana: runRecoverMana,
+  recoverManaAlly: runRecoverManaAlly,
+  rest: runRest,
+  buffAtk: runBuffAtk,
+  applyStatus: runApplyStatus,
+  healStamina: runHealStamina,
+  attributeAttack: runAttributeAttack,
+  alchemy: runAlchemy,
+  nourish: runNourish,
+  surge: runSurge,
+  blaze: runBlaze,
+  castArmor: runCastArmor,
+  vitality: runVitality,
+  nature: runNature,
+  lightCultivate: runLightCultivate,
+  tide: runTide,
+  scorch: runScorch,
+  blast: runBlast,
+};
+
+const ENEMY_ACTIONS = {
+  corrode: { name: '腐蚀', run: runCorrode },
+  taunt: { name: '嘲讽', run: u => log(`${name(u)} 保持嘲讽姿态`, 'note') },
+  transform: { name: '变换', run: runTransform },
+  whip: { name: '鞭挞', run: runBossWhip },
+  pierce: { name: '穿刺', run: runBossPierce },
+  counter: { name: '反击', run: u => log(`${name(u)} 保持反击姿态`, 'note') },
+  suppress: { name: '压制', run: runBossSuppress },
+  burst: { name: '爆发', run: runBossBurst },
+  drain: { name: '抽取', run: runBossDrain },
+};
+
+/* ---------------- 回合流程 ---------------- */
+function nearestStepTo(u, target) {
+  const cur = stepDist(u.cell, target.cell);
+  let best = null;
+  let bestD = cur;
+  for (const id of u.cell.neighbors) {
+    const c = cells[id];
+    const d = stepDist(c, target.cell);
+    if (d < bestD) { bestD = d; best = c; }
+  }
+  return best;
+}
+
+function npcFoes(u) {
+  return aliveUnits().filter(x => x.camp !== u.camp);
+}
+
+function npcInRange(u, foes) {
+  return foes.filter(f => unitGap(u, f) <= u.atkRange);
+}
+
+function npcNearest(u, foes) {
+  return foes.reduce((a, b) => (stepDist(u.cell, a.cell) <= stepDist(u.cell, b.cell) ? a : b));
+}
+
+function npcStepToward(u, foes) {
+  if (!foes.length) return null;
+  const step = nearestStepTo(u, npcNearest(u, foes));
+  return step ? { skillId: 16, targetCellId: step.id } : null;
+}
+
+function npcRandomDodge(u) {
+  const opts = validCells(u, SKILL_MAP[2]);
+  if (!opts.length) return null;
+  return { skillId: 2, targetCellId: opts[Math.floor(Math.random() * opts.length)].id };
+}
+
+function npcHighestDefTarget(list) {
+  return list.reduce((a, b) => (b.def > a.def || (b.def === a.def && b.hp < a.hp) ? b : a));
+}
+
+function npcLowestHpTarget(list) {
+  return list.reduce((a, b) => (b.hp < a.hp ? b : a));
+}
+
+function npcDecideDefault(u) {
+  const foes = npcFoes(u);
+  if (!foes.length) return { skillId: 1 };
+  const inRange = npcInRange(u, foes);
+  if (u.mana >= SKILL_MAP[0].cost.mana && inRange.length) {
+    return { skillId: 0, targetUnitId: npcLowestHpTarget(inRange).id };
+  }
+  if (u.mana >= SKILL_MAP[0].cost.mana) {
+    const step = npcStepToward(u, foes);
+    if (step) return step;
+  }
+  if (u.sta >= (SKILL_MAP[2].cost.sta || 0)) {
+    const dodge = npcRandomDodge(u);
+    if (dodge) return dodge;
+  }
+  return { skillId: 1 };
+}
+
+function npcDecideCorrode(u) {
+  const foes = npcFoes(u);
+  if (!foes.length) return { skillId: 4 };
+  const inRange = npcInRange(u, foes);
+  if (u.mana >= 2 && inRange.length) {
+    return { action: 'corrode', targetUnitId: npcHighestDefTarget(inRange).id };
+  }
+  if (u.mana >= SKILL_MAP[0].cost.mana && inRange.length) {
+    return { skillId: 0, targetUnitId: npcHighestDefTarget(inRange).id };
+  }
+  if (u.mana >= SKILL_MAP[0].cost.mana) {
+    const step = npcStepToward(u, foes);
+    if (step) return step;
+  }
+  if (u.sta >= (SKILL_MAP[2].cost.sta || 0)) {
+    const dodge = npcRandomDodge(u);
+    if (dodge) return dodge;
+  }
+  return { skillId: 4 };
+}
+
+function npcDecideTaunt() {
+  return { action: 'taunt' };
+}
+
+function npcDecideTransform(u) {
+  const foes = npcFoes(u);
+  if (!foes.length) return { skillId: 1 };
+  const inRange = npcInRange(u, foes);
+  if (u.mana >= 2 && inRange.length) {
+    const countered = inRange.filter(t => BEATS[u.attr] === t.attr);
+    const pool = countered.length ? countered : inRange;
+    return { action: 'transform', targetUnitId: npcLowestHpTarget(pool).id };
+  }
+  if (u.mana >= SKILL_MAP[0].cost.mana && inRange.length) {
+    return { skillId: 0, targetUnitId: npcLowestHpTarget(inRange).id };
+  }
+  if (u.mana >= SKILL_MAP[0].cost.mana) {
+    const step = npcStepToward(u, foes);
+    if (step) return step;
+  }
+  if (u.sta >= (SKILL_MAP[2].cost.sta || 0)) {
+    const dodge = npcRandomDodge(u);
+    if (dodge) return dodge;
+  }
+  return { skillId: 4 };
+}
+
+function npcDecideBoss(u) {
+  const foes = npcFoes(u);
+  if (!foes.length) return { action: 'counter' };
+  const inRange = npcInRange(u, foes);
+  if (u.mana * 2 < u.maxMana) return { action: 'drain' };
+  if (u.mana >= 2 && inRange.length) {
+    if (Math.random() < 0.5) {
+      const picks = shuffle(inRange).slice(0, 2);
+      return { action: 'whip', targetUnitIds: picks.map(t => t.id) };
+    }
+    const target = inRange[Math.floor(Math.random() * inRange.length)];
+    return { action: 'pierce', targetUnitId: target.id };
+  }
+  if (u.mana >= 2) {
+    const action = ['counter', 'suppress', 'burst'][Math.floor(Math.random() * 3)];
+    if (action === 'suppress') {
+      const target = foes[Math.floor(Math.random() * foes.length)];
+      return { action, targetUnitId: target.id };
+    }
+    return { action };
+  }
+  return { action: 'counter' };
+}
+
+const ENEMY_TEMPLATES = {
+  1: {
+    index: 1, name: '无特殊', unitName: '敌人',
+    baseStats: { hp: 1, atk: 1, def: 1, sta: 1, mana: 1, atkRange: 1 },
+    methods: { attack: 'normal', defend: 'normal', dodge: 'normal', move: 'normal', spell: 'none', recover: 'none', rest: 'none' },
+    decide: npcDecideDefault,
+  },
+  2: {
+    index: 2, name: '腐蚀', unitName: '腐蚀者',
+    baseStats: { hp: 1, atk: 1, def: 1, sta: 1, mana: 1, atkRange: 1 },
+    methods: { attack: 'corrode', defend: 'normal', dodge: 'normal', move: 'normal', spell: 'none', recover: 'normal', rest: 'none' },
+    decide: npcDecideCorrode,
+  },
+  3: {
+    index: 3, name: '嘲讽', unitName: '嘲讽者',
+    baseStats: { hp: 1, atk: 1, def: 1, sta: 1, mana: 1, atkRange: 1 },
+    methods: { attack: 'none', defend: 'taunt', dodge: 'none', move: 'none', spell: 'none', recover: 'none', rest: 'none' },
+    decide: npcDecideTaunt,
+  },
+  4: {
+    index: 4, name: '变换', unitName: '变换者',
+    baseStats: { hp: 1, atk: 1, def: 1, sta: 1, mana: 1, atkRange: 1 },
+    methods: { attack: 'transform', defend: 'normal', dodge: 'normal', move: 'normal', spell: 'none', recover: 'normal', rest: 'none' },
+    decide: npcDecideTransform,
+  },
+  5: {
+    index: 5, name: 'BOSS', unitName: 'BOSS',
+    baseStats: { hp: 6, atk: 1, def: 1, sta: 0, mana: 4, atkRange: 2 },
+    methods: { attack: 'whip/pierce', defend: 'counter', dodge: 'none', move: 'none', spell: 'suppress/burst', recover: 'drain', rest: 'none' },
+    boss: true, parts: 4, shape: 'diamond',
+    decide: npcDecideBoss,
+  },
+};
+
+const ENEMY_METHOD_INDEX = { none: -1, normal: 0, corrode: 1, taunt: 2, transform: 3 };
+
+function npcDecide(u) {
+  const tpl = ENEMY_TEMPLATES[u.templateId] || ENEMY_TEMPLATES[1];
+  return tpl.decide(u);
+}
+
+function startRound() {
+  state.phase = 'decision';
+  state.decisions = {};
+  state.currentUnitId = null;
+  state.onceUsed = false;
+  draft = null;
+  pendingRelic = null;
+  hoverSkillId = null;
+  lastSkill = null;
+  log(`—— 第 ${state.round} 回合 ——`, 'round');
+
+  for (const u of units) {
+    if (!u.alive) continue;
+    u.damageThisRound = 0;
+    u.damageImmune = false;
+    u.skipped = false;
+    u.tauntUsed = false;
+    if (!u.status.isNormal) {
+      if (u.status.blocksDecision) {
+        u.skipped = true;
+        log(`${name(u)} 处于「${u.status.name}」，本回合无法行动`, 'note');
+      }
+      u.status.tick(u);
+      if (u.status.isNormal) log(`${name(u)} 的「无力」状态结束`, 'note');
+    }
+  }
+
+  for (const u of units) {
+    if (u.alive && !u.skipped && u.camp === 1) state.decisions[u.id] = npcDecide(u);
+  }
+  updateAll();
+  promptNext();
+}
+
+function promptNext() {
+  if (state.over) return;
+  const next = units.find(u => u.alive && !u.skipped && u.camp === 0 && !state.decisions[u.id]);
+  if (!next) { resolveRound(); return; }
+  state.currentUnitId = next.id;
+  updateAll();
+}
+
+function commit(decision) {
+  state.decisions[state.currentUnitId] = decision;
+  draft = null;
+  updateAll();
+  promptNext();
+}
+
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+async function resolveRound() {
+  state.phase = 'resolve';
+  state.currentUnitId = null;
+  updateAll();
+  log('全员决策完成，开始结算', 'note');
+  await sleep(320);
+
+  const order = aliveUnits().sort((a, b) => a.id - b.id);
+  for (const u of order) {
+    if (!u.alive || u.skipped) continue;
+    const d = state.decisions[u.id];
+    if (!d) continue;
+    const act = d.action ? ENEMY_ACTIONS[d.action] : null;
+    const s = d.skillId !== undefined ? SKILL_MAP[d.skillId] : null;
+    if (!act && !s) continue;
+    state.currentUnitId = u.id;
+    updateAll();
+    await sleep(200);
+
+    if (act) {
+      act.run(u, d);
+    } else if (s.type === 'defend') {
+      log(`${name(u)} 保持防御姿态（${s.name}）`, 'note');
+    } else {
+      const fn = METHODS[s.method];
+      if (fn) fn(u, d, s);
+    }
+    triggerInBattle();
+    updateAll();
+    await sleep(460);
+  }
+
+  for (const u of units) if (u.isBoss) bossEndRound(u);
+
+  const mine = units.filter(u => u.alive && u.camp === 0).length;
+  const foes = units.filter(u => u.alive && u.camp === 1).length;
+  if (mine === 0 || foes === 0) {
+    state.over = true;
+    state.reason = 'wipe';
+    state.winner = mine === 0 && foes === 0 ? 'draw' : (foes === 0 ? 0 : 1);
+    await finishGame();
+    return;
+  }
+  if (state.round >= MAX_ROUNDS) {
+    state.over = true;
+    state.reason = 'rounds';
+    state.winner = 1;
+    log(`已达 ${MAX_ROUNDS} 回合上限，主角阵营判负`, 'round');
+    await finishGame();
+    return;
+  }
+  state.round += 1;
+  startRound();
+}
+
+function showWinPrompt() {
+  winPrompt.classList.add('show');
+  winPrompt.setAttribute('aria-hidden', 'false');
+}
+
+function hideWinPrompt() {
+  winPrompt.classList.remove('show');
+  winPrompt.setAttribute('aria-hidden', 'true');
+}
+
+function playVictoryCinematic() {
+  return new Promise(resolve => {
+    const bossVictory = units.some(u => u.isBoss);
+    const lastUnit = units[lastPlayerDamagerId];
+    const fallbackUnit = playerUnits[0];
+    const sourceUnit = lastUnit && lastUnit.camp === 0 ? lastUnit : fallbackUnit;
+    const src = bossVictory ? BOSS_WIN_VIDEO : (sourceUnit && sourceUnit.charId ? SETTLEMENT_VIDEO_BY_CHAR[sourceUnit.charId] : null);
+    if (!src) { resolve(); return; }
+    let done = false;
+    let timer = null;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      if (timer) clearTimeout(timer);
+      victoryVideo.removeEventListener('ended', finish);
+      victoryVideo.removeEventListener('error', finish);
+      victoryVideo.pause();
+      victoryVideoBackdrop.pause();
+      victoryCinematic.classList.remove('show');
+      victoryCinematic.setAttribute('aria-hidden', 'true');
+      resolve();
+    };
+    victoryCinematic.classList.add('show');
+    victoryCinematic.setAttribute('aria-hidden', 'false');
+    const videoSrc = encodeURI(src);
+    victoryVideoBackdrop.src = videoSrc;
+    victoryVideoBackdrop.load();
+    victoryVideo.src = videoSrc;
+    victoryVideo.load();
+    victoryVideo.addEventListener('ended', finish);
+    victoryVideo.addEventListener('error', finish);
+    timer = setTimeout(finish, 12000);
+    victoryVideoBackdrop.play().catch(() => {});
+    victoryVideo.muted = false;
+    victoryVideo.play().catch(() => {
+      victoryVideo.muted = true;
+      victoryVideo.play().catch(finish);
+    });
+  });
+}
+
+async function finishGame() {
+  restoreBattleStats();
+  updateAll();
+  if (run.active) {
+    run.phase = 'settle';
+    const won = state.winner === 0;
+    if (!won) clearSave();
+    log(won ? '战斗胜利' : '战斗失败', 'round');
+    if (won) {
+      showWinPrompt();
+      await sleep(800);
+      await playVictoryCinematic();
+      hideWinPrompt();
+      showSettlement();
+    } else {
+      openModal('你输了', `在第 ${run.stageIndex + 1} 层倒下了。`, [
+        { label: '回到启动页面', primary: true, onClick: backToStart },
+      ]);
+    }
+    return;
+  }
+  const title = state.winner === 'draw' ? '平 局' : (state.winner === 0 ? '胜 利' : '战 败');
+  bannerTitle.textContent = title;
+  bannerTitle.style.color = state.winner === 'draw' ? '#cbd6e6' : (state.winner === 0 ? '#7fe0c0' : '#f08a8a');
+  bannerSub.textContent = state.reason === 'rounds'
+    ? `超出 ${MAX_ROUNDS} 回合，主角阵营判负`
+    : `共 ${state.round} 回合`;
+  banner.classList.add('show');
+  log(`对局结束：${title}`, 'round');
+}
+
+/* ---------------- 输入 ---------------- */
+const raycaster = new THREE.Raycaster();
+const pointer = new THREE.Vector2();
+
+function pickables() {
+  const list = cellMeshes.filter(Boolean);
+  units.forEach(u => {
+    if (!u.alive || !u.mesh) return;
+    const gems = u.mesh.userData.gems || [u.mesh.userData.gem];
+    for (const g of gems) if (g) list.push(g);
+  });
+  return list;
+}
+
+function chooseSkill(s) {
+  const actor = currentActor();
+  if (!actor || state.phase !== 'decision' || actor.camp !== 0 || actor.skipped) return;
+  pendingRelic = null;
+  lastSkill = { skillId: s.id, unitId: actor.id };
+  draft = { skill: s, unit: actor };
+  updateAll();
+}
+
+function draftReady() {
+  if (!draft) return false;
+  const t = draft.skill.target;
+  if (t === 'none') return true;
+  if (t === 'enemy' || t === 'ally') return draft.targetUnitId !== undefined;
+  if (t === 'cell') return draft.targetCellId !== undefined;
+  return false;
+}
+
+function confirmDecision() {
+  if (state.phase !== 'decision' || !draftReady()) return;
+  const dec = { skillId: draft.skill.id };
+  if (draft.targetUnitId !== undefined) dec.targetUnitId = draft.targetUnitId;
+  if (draft.targetCellId !== undefined) dec.targetCellId = draft.targetCellId;
+  if (draft.targetPartCellId !== undefined) dec.targetPartCellId = draft.targetPartCellId;
+  commit(dec);
+}
+
+function updateFoot() {
+  if (state.phase === 'deploy' && deployment) {
+    const left = deployment.order.length - deployment.index;
+    draftInfo.textContent = left > 0 ? `待布阵 ${left} 人` : '全员已就位';
+    confirmBtn.disabled = left > 0;
+    confirmBtn.textContent = '开始战斗';
+    return;
+  }
+  confirmBtn.textContent = '确定决策';
+  const actor = currentActor();
+  const isPlayerTurn = state.phase === 'decision' && !state.over && actor && actor.camp === 0 && !actor.skipped;
+  confirmBtn.disabled = !(isPlayerTurn && draftReady());
+
+  if (!isPlayerTurn || !draft) {
+    draftInfo.textContent = isPlayerTurn ? '未选择技能' : '等待行动';
+    return;
+  }
+  const s = draft.skill;
+  let t = s.name;
+  if (draft.targetUnitId !== undefined) t += ` → ${units[draft.targetUnitId].name}`;
+  if (draft.targetCellId !== undefined) t += ` → ${cells[draft.targetCellId].label}`;
+  draftInfo.innerHTML = `已选：<b>${t}</b>${draftReady() ? '' : ' · 待选择目标'}`;
+}
+
+confirmBtn.addEventListener('click', () => {
+  if (state.phase === 'deploy') { finishDeployment(); return; }
+  confirmDecision();
+});
+
+spBody.addEventListener('click', ev => {
+  const relic = ev.target.closest('[data-relic]');
+  if (relic) {
+    if (relic.disabled) return;
+    const id = relic.dataset.relic;
+    if (ARTIFACTS[id].target) {
+      pendingRelic = { id };
+      updateAll();
+    } else {
+      useOnceArtifact(id);
+    }
+    return;
+  }
+  const btn = ev.target.closest('.skill');
+  if (!btn || btn.disabled) return;
+  const s = SKILL_MAP[Number(btn.dataset.id)];
+  if (s) chooseSkill(s);
+});
+
+spBody.addEventListener('mouseover', ev => {
+  const btn = ev.target.closest('.skill');
+  if (!btn) return;
+  const id = Number(btn.dataset.id);
+  if (id === hoverSkillId) return;
+  hoverSkillId = id;
+  refreshCard();
+});
+
+spBody.addEventListener('mouseleave', () => {
+  if (hoverSkillId === null) return;
+  hoverSkillId = null;
+  refreshCard();
+});
+
+renderer.domElement.addEventListener('pointerdown', ev => {
+  if (state.phase === 'deploy') {
+    const rect = renderer.domElement.getBoundingClientRect();
+    pointer.x = ((ev.clientX - rect.left) / rect.width) * 2 - 1;
+    pointer.y = -((ev.clientY - rect.top) / rect.height) * 2 + 1;
+    raycaster.setFromCamera(pointer, camera);
+    const hits = raycaster.intersectObjects(pickables(), false);
+    for (const hit of hits) {
+      const { cellId, unitId } = hit.object.userData;
+      if (unitId !== undefined) {
+        const u = units[unitId];
+        if (u && u.alive && u.camp === 0 && deployment) {
+          const i = deployment.order.indexOf(u);
+          if (i >= 0 && i !== deployment.index) {
+            selectDeployUnit(u);
+            return;
+          }
+        }
+      }
+      const id = cellId !== undefined ? cellId : (unitId !== undefined ? units[unitId].cell.id : undefined);
+      if (id === undefined) continue;
+      placeCurrent(cells[id]);
+      return;
+    }
+    return;
+  }
+  if (!draft && !pendingRelic) return;
+  if (draft && draft.skill.target === 'none') return;
+  const rect = renderer.domElement.getBoundingClientRect();
+  pointer.x = ((ev.clientX - rect.left) / rect.width) * 2 - 1;
+  pointer.y = -((ev.clientY - rect.top) / rect.height) * 2 + 1;
+  raycaster.setFromCamera(pointer, camera);
+  const hits = raycaster.intersectObjects(pickables(), false);
+  if (!hits.length) return;
+
+  if (pendingRelic) {
+    const a = ARTIFACTS[pendingRelic.id];
+    for (const hit of hits) {
+      const { unitId } = hit.object.userData;
+      if (unitId === undefined) continue;
+      const u = units[unitId];
+      if (!u || !u.alive) continue;
+      if (a.target === 'ally' && u.camp !== 0) continue;
+      if (a.target === 'enemy' && u.camp !== 1) continue;
+      useOnceArtifact(pendingRelic.id, u);
+      return;
+    }
+    return;
+  }
+
+  const s = draft.skill;
+  const actor = draft.unit;
+
+  for (const hit of hits) {
+    const { unitId, cellId } = hit.object.userData;
+    if (s.target === 'enemy' || s.target === 'ally') {
+      if (unitId === undefined) continue;
+      if (!validTargets(actor, s).some(u => u.id === unitId)) continue;
+      const targetUnit = units[unitId];
+      const partCellId = hit.object.userData.partCellId;
+      if (targetUnit && targetUnit.isBoss && partCellId !== undefined) {
+        if (stepDist(actor.cell, cells[partCellId]) > actor.atkRange) continue;
+      }
+      draft.targetUnitId = unitId;
+      draft.targetCellId = undefined;
+      draft.targetPartCellId = targetUnit && targetUnit.isBoss ? partCellId : undefined;
+      updateAll();
+      return;
+    }
+    if (s.target === 'cell') {
+      const id = cellId !== undefined ? cellId : (unitId !== undefined ? units[unitId].cell.id : undefined);
+      if (id === undefined) continue;
+      if (!validCells(actor, s).some(c => c.id === id)) continue;
+      draft.targetCellId = id;
+      updateAll();
+      return;
+    }
+  }
+});
+
+window.addEventListener('keydown', ev => {
+  if (ev.key === 'Escape' && (draft || pendingRelic)) {
+    draft = null;
+    pendingRelic = null;
+    updateAll();
+  }
+});
+
+window.addEventListener('resize', onResize);
+function onResize() {
+  const w = stage.clientWidth, h = stage.clientHeight;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+
+/* ---------------- 肉鸽 ---------------- */
+const RUN_LAYERS = CONFIG.layers;
+const BOSS_LAYER = RUN_LAYERS - 1;
+const NODE_TYPES = {
+  fight: { name: '打怪', desc: '进入一次棋盘战斗' },
+  event: { name: '奇遇', desc: '宝物三选一' },
+  rest: { name: '休息', desc: '全队生命上限 +1（永久）' },
+  boss: { name: 'BOSS', desc: '最终 BOSS 战' },
+};
+
+const LEVEL_ELEMENTS = ['金', '木', '水', '火', '土'];
+const LEVEL_DIR_URL = '/' + encodeURIComponent('关卡集') + '/';
+
+function levelFileForLayer(layer) {
+  const idx = Math.floor(rnd('level:' + layer) * LEVEL_ELEMENTS.length) % LEVEL_ELEMENTS.length;
+  const elem = LEVEL_ELEMENTS[idx];
+  if (layer >= RUN_LAYERS) return `关卡${layer}-${elem}boss.json`;
+  const candidates = [layer - 1, layer, layer + 1].filter(n => n >= 1 && n < RUN_LAYERS);
+  const pick = candidates[Math.floor(rnd('levelNum:' + layer) * candidates.length) % candidates.length];
+  return `关卡${pick}-${elem}.json`;
+}
+
+async function loadLevelForLayer(layer) {
+  const file = levelFileForLayer(layer);
+  const res = await fetch(LEVEL_DIR_URL + encodeURIComponent(file), { cache: 'no-store' });
+  if (!res.ok) throw new Error(`关卡文件 ${file} 读取失败（HTTP ${res.status}）`);
+  const data = await res.json();
+  if (!data || !Array.isArray(data.cells) || data.cells.length !== 51 || !Array.isArray(data.enemies)) {
+    throw new Error(`关卡文件 ${file} 格式不正确`);
+  }
+  return { ...data, file };
+}
+
+class RogueRun {
+  constructor(difficulty, luckBonus = 0) {
+    this.difficulty = Math.max(CONFIG.difficulty.min, Math.min(CONFIG.difficulty.max, difficulty | 0));
+    this.luckBonus = luckBonus;
+    this.luck = Math.max(0, CONFIG.luck.base - CONFIG.luck.perDifficulty * this.difficulty + luckBonus);
+    this.layers = Array.from({ length: RUN_LAYERS }, () => []);
+    this.index = new Map();
+    this.seq = 0;
+    this.generate();
+  }
+
+  get extraChance() {
+    const v = 0.5 + (this.luck - CONFIG.luck.pivot) * CONFIG.luck.chancePerPoint;
+    return Math.min(CONFIG.luck.max, Math.max(CONFIG.luck.min, v));
+  }
+
+  node(layer, type) {
+    const key = layer + ':' + type;
+    if (!this.index.has(key)) {
+      const n = { id: this.seq++, layer, type, children: [] };
+      this.index.set(key, n);
+      this.layers[layer].push(n);
+    }
+    return this.index.get(key);
+  }
+
+  childTypes(type) {
+    const p = this.extraChance;
+    if (type === 'fight') {
+      return ['fight', 'rest', ...(Math.random() < p * 0.5 ? ['event'] : [])];
+    }
+    if (type === 'event') return ['fight', 'rest'];
+    if (type === 'rest') return ['fight', ...(Math.random() < p ? ['event'] : [])];
+    return [];
+  }
+
+  generate() {
+    const first = this.node(0, 'fight');
+    let prev = [first];
+    for (let layer = 1; layer < BOSS_LAYER; layer++) {
+      for (const n of prev) {
+        n.children = this.childTypes(n.type).map(t => this.node(layer, t));
+      }
+      prev = this.layers[layer].slice();
+    }
+    const boss = this.node(BOSS_LAYER, 'boss');
+    for (const n of prev) n.children = [boss];
+  }
+
+  options(path) {
+    if (!path.length) return this.layers[0];
+    return path[path.length - 1].children;
+  }
+
+  static fromJSON(d) {
+    const r = Object.create(RogueRun.prototype);
+    r.difficulty = d.difficulty;
+    r.luckBonus = d.luckBonus || 0;
+    r.luck = Math.max(0, CONFIG.luck.base - CONFIG.luck.perDifficulty * d.difficulty + r.luckBonus);
+    r.index = new Map();
+    r.seq = 0;
+    r.layers = (d.layers || []).map((nodes, layer) => nodes.map(n => {
+      const node = { id: n.id, layer, type: n.type, children: [] };
+      r.index.set(n.id, node);
+      return node;
+    }));
+    for (const [id, kids] of Object.entries(d.children || {})) {
+      const n = r.index.get(Number(id));
+      if (n) n.children = kids.map(k => r.index.get(k)).filter(Boolean);
+    }
+    return r;
+  }
+}
+
+const ARTIFACT_KINDS = {
+  out: { name: '战斗外', color: '#5fa8d8' },
+  in: { name: '战斗内', color: '#e0b25c' },
+  once: { name: '单次', color: '#a98cf0' },
+  gain: { name: '获得时', color: '#7fc8a8' },
+};
+
+const ARTIFACTS = {
+  longquan: {
+    id: 'longquan', name: '龙泉', kind: 'out', sword: true, desc: '幸运值 +10', luckBonus: CONFIG.artifact.longquanLuck,
+    onNodeConfirm(inst) {
+      if (inst.outApplied) return;
+      inst.outApplied = true;
+      notifyArtifact(`藏品【龙泉】生效：幸运值 +${CONFIG.artifact.longquanLuck}`);
+      renderRelicCard();
+    },
+  },
+  taie: {
+    id: 'taie', name: '太阿', kind: 'once', sword: true, desc: '主角团回复全部血量',
+    use() {
+      units.filter(u => u.alive && u.camp === 0).forEach(u => { u.hp = u.maxHp; });
+      notifyArtifact('藏品【太阿】：主角团回复全部血量');
+    },
+  },
+  ganjiang: {
+    id: 'ganjiang', name: '干将', kind: 'gain', sword: true, desc: '全队攻击 +2（永久）',
+    onGain() {
+      playerUnits.forEach(u => { u.permAtk += CONFIG.artifact.ganjiangAtk; u.atk += CONFIG.artifact.ganjiangAtk; });
+      notifyArtifact(`藏品【干将】：全队攻击 +${CONFIG.artifact.ganjiangAtk}（永久）`);
+      renderRelicCard();
+    },
+  },
+  moye: {
+    id: 'moye', name: '莫邪', kind: 'gain', sword: true, desc: '全队体力与魔力上限 +2（永久）',
+    onGain() {
+      playerUnits.forEach(u => {
+        u.permMaxSta += CONFIG.artifact.moyeMax;
+        u.maxSta += CONFIG.artifact.moyeMax;
+        u.permMaxMana += CONFIG.artifact.moyeMax;
+        u.maxMana += CONFIG.artifact.moyeMax;
+      });
+      notifyArtifact(`藏品【莫邪】：全队体力 / 魔力上限 +${CONFIG.artifact.moyeMax}（永久）`);
+      renderRelicCard();
+    },
+  },
+  b1: {
+    id: 'b1', name: '回春丹', kind: 'once', desc: '全队立刻回复 2 点生命',
+    use() {
+      healParty(2);
+      notifyArtifact('藏品【回春丹】：全队回复 2 点生命');
+    },
+  },
+  b2: {
+    id: 'b2', name: '聚灵珠', kind: 'gain', desc: '主角魔力上限 +3（永久）',
+    onGain() {
+      const h = playerUnits[0];
+      if (h) { h.permMaxMana += 3; h.maxMana += 3; }
+    },
+  },
+  b3: {
+    id: 'b3', name: '强身符', kind: 'gain', desc: '全队体力上限 +2（永久）',
+    onGain() {
+      playerUnits.forEach(u => { u.permMaxSta += 2; u.maxSta += 2; });
+    },
+  },
+  b4: {
+    id: 'b4', name: '刺心钉', kind: 'once', target: 'enemy', desc: '对一名敌人造成 3 点固定伤害',
+    use(target) {
+      if (!target) return;
+      applyDamage(target, 3, playerUnits[0]);
+      notifyArtifact(`藏品【刺心钉】：对 ${target.name} 造成 3 点伤害`);
+    },
+  },
+};
+const ARTIFACT_IDS = Object.keys(ARTIFACTS);
+const SWORD_IDS = Object.keys(ARTIFACTS).filter(id => ARTIFACTS[id].sword);
+const TREASURES = ['b1', 'b2', 'b3', 'b4'];
+
+const FORTUNES = [
+  { key: 'great', name: '大吉', desc: '全体攻击力 +1（本场）', apply() { playerUnits.forEach(u => { if (u.alive) u.atk += 1; }); } },
+  { key: 'good', name: '中吉', desc: '主角攻击力 +1（本场）', apply() { const h = playerUnits[0]; if (h && h.alive) h.atk += 1; } },
+  { key: 'small', name: '小吉', desc: '获得一件宝物【回春丹】', apply() { grantArtifact('b1'); } },
+  { key: 'bad', name: '小凶', desc: '主角本场攻击 -1', apply() { const h = playerUnits[0]; if (h && h.alive) h.atk = Math.max(0, h.atk - 1); } },
+  { key: 'awful', name: '大凶', desc: '全队本场攻击 -1', apply() { playerUnits.forEach(u => { if (u.alive) u.atk = Math.max(0, u.atk - 1); }); } },
+];
+
+function currentLuck() {
+  if (run.rogue) return run.rogue.luck;
+  return Math.max(0, CONFIG.luck.base - CONFIG.luck.perDifficulty * run.difficulty + run.luckBonus);
+}
+
+function fortuneWeight(f) {
+  const d = (currentLuck() - 35) / 5;
+  switch (f.key) {
+    case 'great': return Math.max(0, 10 + d);
+    case 'good': return Math.max(0, 20 + d * 2);
+    case 'small': return Math.max(0, 40 + d * 4);
+    case 'bad': return Math.max(0, 20 - d * 2);
+    case 'awful': return Math.max(0, 10 - d);
+    default: return 0;
+  }
+}
+
+function pickFortune(tag) {
+  const total = FORTUNES.reduce((n, f) => n + fortuneWeight(f), 0);
+  let r = rnd(tag) * total;
+  for (const f of FORTUNES) {
+    r -= fortuneWeight(f);
+    if (r < 0) return f;
+  }
+  return FORTUNES[FORTUNES.length - 1];
+}
+
+const COMPANIONS = [
+  { id: 'shen', name: '沈桐桐', attr: 0, stats: { hp: 15, atk: 3, def: 4, mana: 4, sta: 4, atkRange: 3 }, special: COMPANION_SKILLS.shen },
+  { id: 'qian', name: '芊儿', attr: 1, stats: { hp: 10, atk: 3, def: 2, mana: 5, sta: 3, atkRange: 4 }, special: COMPANION_SKILLS.qian },
+  { id: 'nian', name: '念乔', attr: 2, stats: { hp: 12, atk: 3, def: 3, mana: 4, sta: 3, atkRange: 3 }, special: COMPANION_SKILLS.nian },
+  { id: 'chi', name: '赤遥', attr: 3, stats: { hp: 10, atk: 4, def: 3, mana: 6, sta: 3, atkRange: 4 }, special: COMPANION_SKILLS.chi },
+];
+const COMPANION_MAP = Object.fromEntries(COMPANIONS.map(c => [c.id, c]));
+const CHAR_INTROS = {
+  hero: '被背叛的修仙者，从凡尘中崛起的大能',
+  qian: '来自云芝山的木系仙女，寻求真正的心',
+  shen: '砺剑门的圣女，万人敬仰',
+  chi: '焚天宗宗主，实力在乾南数一数二',
+  nian: '虽为散修，但与主角同行，实力渐长',
+};
+const ENEMY_INTROS = {
+  1: '山洞中的魔物',
+  2: '攻击富含剧毒的蛇怪，技能会削减防御',
+  3: '由天然石头变化而成的妖，在攻击范围内时不能攻击其它敌人',
+  4: '由怨气聚合的虚影，技能会改变地形',
+  5: '山洞深处的双头食人花，四个根须是他的弱点，小心他非常强大',
+};
+
+function unitIntro(u) {
+  if (!u) return '';
+  if (u.isBoss) return ENEMY_INTROS[5];
+  if (u.charId && CHAR_INTROS[u.charId]) return CHAR_INTROS[u.charId];
+  return ENEMY_INTROS[u.templateId] || '';
+}
+const run = {
+  active: false,
+  difficulty: 5,
+  rogue: null,
+  stageIndex: 0,
+  path: [],
+  phase: 'start',
+  artifacts: [],
+  companions: [],
+  luckBonus: 0,
+  heroAttr: 0,
+  grantedLayers: [],
+  seed: 0,
+  battleBackup: null,
+  battleLevel: null,
+};
+
+const startScreen = document.getElementById('startScreen');
+const diffVal = document.getElementById('diffVal');
+const luckVal = document.getElementById('luckVal');
+const diffMul = document.getElementById('diffMul');
+const diffUp = document.getElementById('diffUp');
+const diffDown = document.getElementById('diffDown');
+const startBtn = document.getElementById('startBtn');
+const modal = document.getElementById('modal');
+const modalTitle = document.getElementById('modalTitle');
+const modalBody = document.getElementById('modalBody');
+const modalActions = document.getElementById('modalActions');
+const mapPanel = document.getElementById('mapPanel');
+const mapViewport = document.getElementById('mapViewport');
+const mapBody = document.getElementById('mapBody');
+const mapLayerLabels = document.getElementById('mapLayerLabels');
+const mapInfo = document.getElementById('mapInfo');
+const runInfo = document.getElementById('runInfo');
+const relicCard = document.getElementById('relicCard');
+const relicHead = document.getElementById('relicHead');
+const relicList = document.getElementById('relicList');
+const relicCount = document.getElementById('relicCount');
+const toastEl = document.getElementById('toast');
+const continueBtn = document.getElementById('continueBtn');
+const rulesBtn = document.getElementById('rulesBtn');
+const rulesModal = document.getElementById('rulesModal');
+const rulesBody = document.getElementById('rulesBody');
+const rulesClose = document.getElementById('rulesClose');
+let rulesLoaded = false;
+
+const SAVE_KEY = 'wuxing_run_v1';
+
+function saveRun() {
+  if (!run.active || !run.rogue) return;
+  const children = {};
+  run.rogue.layers.forEach(nodes => nodes.forEach(n => { children[n.id] = n.children.map(c => c.id); }));
+  const data = {
+    v: 4,
+    difficulty: run.rogue.difficulty,
+    luckBonus: run.luckBonus,
+    heroAttr: run.heroAttr,
+    pathIds: run.path.map(n => n.id),
+    artifacts: run.artifacts.map(a => ({ id: a.id, count: a.count })),
+    companions: run.companions.map(c => c.id),
+    seed: run.seed,
+    playerState: playerUnits.map(u => ({ charId: u.charId, hp: u.hp, maxHp: u.maxHp, atk: u.atk, def: u.def, maxDef: u.maxDef, sta: u.sta, maxSta: u.maxSta, mana: u.mana, maxMana: u.maxMana, alive: u.alive, permAtk: u.permAtk, permDef: u.permDef, permMaxHp: u.permMaxHp, permMaxSta: u.permMaxSta, permMaxMana: u.permMaxMana })),
+    grantedLayers: run.grantedLayers.slice(),
+    layers: run.rogue.layers.map(nodes => nodes.map(n => ({ id: n.id, type: n.type }))),
+    children,
+  };
+  try { localStorage.setItem(SAVE_KEY, JSON.stringify(data)); } catch (e) {}
+}
+
+function hasSave() {
+  try {
+    const d = JSON.parse(localStorage.getItem(SAVE_KEY));
+    return !!(d && (d.v === 1 || d.v === 2 || d.v === 3 || d.v === 4) && Array.isArray(d.layers) && d.layers.length === RUN_LAYERS);
+  } catch (e) {
+    return false;
+  }
+}
+
+function clearSave() {
+  try { localStorage.removeItem(SAVE_KEY); } catch (e) {}
+}
+
+function restoreRun() {
+  let data = null;
+  try { data = JSON.parse(localStorage.getItem(SAVE_KEY)); } catch (e) {}
+  if (!data) return;
+  run.difficulty = data.difficulty;
+  run.luckBonus = data.luckBonus || 0;
+  run.heroAttr = data.heroAttr || 0;
+  run.artifacts = (data.artifacts || []).map(a => ({ id: a.id, count: a.count, inApplied: false, outApplied: false }));
+  run.companions = (data.companions || []).map(id => COMPANIONS.find(c => c.id === id)).filter(Boolean).slice(0, 2);
+  run.rogue = RogueRun.fromJSON(data);
+  run.grantedLayers = data.grantedLayers || [];
+  run.seed = data.seed || Math.floor(Math.random() * 1e9);
+  createPlayerUnits();
+  const byChar = new Map(playerUnits.map(u => [u.charId, u]));
+  const oldOrder = ['hero', ...(data.companions || [])];
+  (data.playerState || []).forEach((s, i) => {
+    let u = s.charId ? byChar.get(s.charId) : null;
+    if (!u && i === 0) u = playerUnits[0];
+    if (!u && data.v <= 2) u = byChar.get(oldOrder[i]);
+    if (!u) u = playerUnits[i];
+    if (!u) return;
+    const { charId, ...rest } = s;
+    Object.assign(u, rest);
+  });
+  if (data.v === 1) applyStartSwordPermanent();
+  run.path = (data.pathIds || []).map(id => run.rogue.index.get(id)).filter(Boolean);
+  if (run.path.length >= RUN_LAYERS) { clearSave(); return; }
+  run.stageIndex = run.path.length;
+  run.active = true;
+  run.phase = 'choice';
+  startScreen.classList.remove('show');
+  updateSide();
+  updateTop();
+  renderMap();
+  renderRelicCard();
+  showChoice();
+}
+
+function renderStart() {
+  diffVal.textContent = run.difficulty;
+  continueBtn.style.display = hasSave() ? '' : 'none';
+  luckVal.textContent = CONFIG.luck.base - CONFIG.luck.perDifficulty * run.difficulty;
+  diffMul.textContent = (CONFIG.scaling.base + (run.difficulty - 1) * CONFIG.scaling.difficulty).toFixed(1);
+}
+
+function escapeMdHtml(s) {
+  return String(s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function inlineMd(s) {
+  return escapeMdHtml(s)
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+}
+
+function renderRulesMarkdown(md) {
+  const lines = String(md).replace(/\r\n/g, '\n').split('\n');
+  const out = [];
+  const isSep = line => /^\s*\|?\s*:?-{3,}/.test(line);
+  const splitRow = line => line.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map(s => s.trim());
+  const isBlock = line => /^(#{1,3}\s|>\s?|---+\s*$|\|)/.test(line) || /^[-*]\s+/.test(line) || /^\d+\.\s+/.test(line);
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i];
+    if (!line.trim()) { i++; continue; }
+    if (/^###\s+/.test(line)) { out.push(`<h3>${inlineMd(line.replace(/^###\s+/, ''))}</h3>`); i++; continue; }
+    if (/^##\s+/.test(line)) { out.push(`<h2>${inlineMd(line.replace(/^##\s+/, ''))}</h2>`); i++; continue; }
+    if (/^#\s+/.test(line)) { out.push(`<h1>${inlineMd(line.replace(/^#\s+/, ''))}</h1>`); i++; continue; }
+    if (/^---+\s*$/.test(line)) { out.push('<hr />'); i++; continue; }
+    if (/^>\s?/.test(line)) {
+      const buf = [];
+      while (i < lines.length && /^>\s?/.test(lines[i])) { buf.push(lines[i].replace(/^>\s?/, '').trim()); i++; }
+      out.push(`<blockquote>${inlineMd(buf.join(' '))}</blockquote>`);
+      continue;
+    }
+    if (line.trim().startsWith('|') && i + 1 < lines.length && isSep(lines[i + 1])) {
+      const head = splitRow(line);
+      i += 2;
+      const rows = [];
+      while (i < lines.length && lines[i].trim().startsWith('|')) { rows.push(splitRow(lines[i])); i++; }
+      out.push('<table><thead><tr>' + head.map(c => `<th>${inlineMd(c)}</th>`).join('') + '</tr></thead><tbody>'
+        + rows.map(r => '<tr>' + r.map(c => `<td>${inlineMd(c)}</td>`).join('') + '</tr>').join('') + '</tbody></table>');
+      continue;
+    }
+    if (/^[-*]\s+/.test(line)) {
+      const items = [];
+      while (i < lines.length && /^[-*]\s+/.test(lines[i])) { items.push(lines[i].replace(/^[-*]\s+/, '')); i++; }
+      out.push('<ul>' + items.map(t => `<li>${inlineMd(t)}</li>`).join('') + '</ul>');
+      continue;
+    }
+    if (/^\d+\.\s+/.test(line)) {
+      const items = [];
+      while (i < lines.length && /^\d+\.\s+/.test(lines[i])) { items.push(lines[i].replace(/^\d+\.\s+/, '')); i++; }
+      out.push('<ol>' + items.map(t => `<li>${inlineMd(t)}</li>`).join('') + '</ol>');
+      continue;
+    }
+    const buf = [line.trim()];
+    i++;
+    while (i < lines.length && lines[i].trim() && !isBlock(lines[i].trim())) { buf.push(lines[i].trim()); i++; }
+    out.push(`<p>${inlineMd(buf.join(' '))}</p>`);
+  }
+  return out.join('\n');
+}
+
+function openRulesModal() {
+  rulesModal.classList.add('show');
+  rulesModal.setAttribute('aria-hidden', 'false');
+  if (rulesLoaded) return;
+  rulesBody.innerHTML = '<p class="muted">规则书加载中…</p>';
+  fetch(encodeURI('/文档/规则书.md'), { cache: 'no-store' })
+    .then(res => {
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      return res.text();
+    })
+    .then(md => {
+      rulesBody.innerHTML = renderRulesMarkdown(md);
+      rulesLoaded = true;
+    })
+    .catch(() => {
+      rulesBody.innerHTML = '<p class="muted">规则书加载失败，请确认本地服务已启动。</p>';
+    });
+}
+
+function closeRulesModal() {
+  rulesModal.classList.remove('show');
+  rulesModal.setAttribute('aria-hidden', 'true');
+}
+
+function openModal(title, bodyHtml, buttons) {
+  modal.classList.remove('companion-pick', 'sword-pick');
+  modalTitle.innerHTML = title;
+  modalBody.innerHTML = bodyHtml;
+  modalActions.innerHTML = '';
+  for (const b of buttons) {
+    const btn = document.createElement('button');
+    btn.className = 'modal-btn' + (b.type ? ' t-' + b.type : '') + (b.primary ? ' primary' : '') + (b.lucky ? ' lucky' : '');
+    btn.textContent = b.label;
+    btn.onclick = b.onClick;
+    modalActions.appendChild(btn);
+  }
+  modal.classList.add('show');
+}
+
+function closeModal() {
+  modal.classList.remove('show', 'companion-pick', 'sword-pick');
+}
+
+function updateSide() {
+  const inBattle = run.active && run.phase === 'battle';
+  mapPanel.style.display = inBattle ? 'none' : 'flex';
+  skillPanel.style.display = inBattle ? 'flex' : 'none';
+}
+
+const MAP_MIN_W = 360;
+const MAP_LAYER_H = 180;
+const MAP_PAD_Y = 40;
+let mapLabelItems = [];
+
+function rowPercents(count) {
+  if (count === 1) return [0.5];
+  if (count === 2) return [1 / 3, 2 / 3];
+  if (count === 3) return [0.25, 0.5, 0.75];
+  return Array.from({ length: count }, (_, i) => (i + 0.5) / count);
+}
+
+function updateMapLabels() {
+  const top = mapBody.scrollTop;
+  for (const item of mapLabelItems) {
+    item.el.style.top = `${item.y - top}px`;
+  }
+}
+
+function renderMap() {
+  mapBody.innerHTML = '';
+  mapLayerLabels.innerHTML = '';
+  mapLabelItems = [];
+  if (!run.rogue) {
+    mapInfo.textContent = '';
+    return;
+  }
+  mapInfo.textContent = `难度 ${run.rogue.difficulty} · 幸运 ${run.rogue.luck}`;
+  const opts = run.phase === 'battle' || run.phase === 'settle' ? [] : run.rogue.options(run.path);
+  const root = run.rogue.layers[0][0];
+  if (!root) return;
+
+  const viewW = mapBody.clientWidth;
+  const width = Math.max(MAP_MIN_W, viewW);
+  const viewOffsetX = (width - viewW) / 2;
+  const height = RUN_LAYERS * MAP_LAYER_H + MAP_PAD_Y * 2;
+  const canvas = document.createElement('div');
+  canvas.id = 'mapCanvas';
+  canvas.className = 'map-canvas';
+  canvas.style.width = `${width}px`;
+  canvas.style.height = `${height}px`;
+  mapBody.appendChild(canvas);
+
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('width', width);
+  svg.setAttribute('height', height);
+  canvas.appendChild(svg);
+
+  const pathSet = new Set(run.path);
+  const current = run.path[run.path.length - 1] || null;
+  for (const nodes of run.rogue.layers) {
+    const percents = rowPercents(nodes.length);
+    nodes.forEach((n, i) => {
+      n._mx = viewOffsetX + percents[i] * viewW;
+      n._my = MAP_PAD_Y + n.layer * MAP_LAYER_H + MAP_LAYER_H / 2;
+    });
+  }
+
+  for (const nodes of run.rogue.layers) {
+    for (const n of nodes) {
+      for (const child of n.children) {
+        const d = `M ${n._mx} ${n._my + 15} L ${child._mx} ${child._my - 15}`;
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path.setAttribute('d', d);
+        path.setAttribute('class', 'map-edge' + (pathSet.has(n) && pathSet.has(child) ? ' active' : ''));
+        svg.appendChild(path);
+      }
+    }
+  }
+
+  run.rogue.layers.forEach((nodes, layer) => {
+    const label = document.createElement('div');
+    label.className = 'map-layer-label';
+    const y = MAP_PAD_Y + layer * MAP_LAYER_H + 8;
+    label.textContent = `${layer + 1} 层`;
+    mapLayerLabels.appendChild(label);
+    mapLabelItems.push({ el: label, y });
+    for (const n of nodes) {
+      const chip = document.createElement('span');
+      const taken = pathSet.has(n);
+      const isOption = opts.includes(n);
+      chip.className = `map-node t-${n.type}${taken ? ' taken' : ''}${isOption ? ' option' : ''}${n === current ? ' current' : ''}`;
+      chip.style.left = `${n._mx - 48}px`;
+      chip.style.top = `${n._my - 15}px`;
+      chip.textContent = NODE_TYPES[n.type].name;
+      canvas.appendChild(chip);
+    }
+  });
+
+  const target = current || root;
+  const center = () => {
+    mapBody.scrollLeft = Math.max(0, width / 2 - viewW / 2);
+    mapBody.scrollTop = Math.max(0, target._my - mapBody.clientHeight * 0.35);
+    updateMapLabels();
+  };
+  center();
+  requestAnimationFrame(center);
+  setTimeout(center, 60);
+}
+
+mapBody.addEventListener('scroll', updateMapLabels, { passive: true });
+
+function showChoice() {
+  run.phase = 'choice';
+  updateSide();
+  updateTop();
+  renderMap();
+  triggerOutOfBattle();
+  const opts = run.rogue.options(run.path);
+  openModal(
+    `第 ${run.stageIndex + 1} / ${RUN_LAYERS} 层`,
+    `已通过 ${run.path.length} / ${RUN_LAYERS} 层，请选择本层行动：`,
+    opts.map(n => ({
+      label: `${NODE_TYPES[n.type].name} · ${NODE_TYPES[n.type].desc}`,
+      type: n.type,
+      onClick: () => chooseNode(n),
+    }))
+  );
+  saveRun();
+}
+
+function chooseNode(node) {
+  run.path.push(node);
+  renderMap();
+  if (node.type === 'fight' || node.type === 'boss') {
+    enterBattle();
+    return;
+  }
+  if (node.type === 'rest') { doRest(); return; }
+  if (node.type === 'event') { showEvent(); return; }
+  run.phase = 'story';
+  updateSide();
+}
+
+function enterBattle(level = null) {
+  run.phase = 'battle';
+  run.battleBackup = {
+    player: playerUnits.map(u => ({ hp: u.hp, sta: u.sta, mana: u.mana, atk: u.atk, def: u.def, maxDef: u.maxDef, maxSta: u.maxSta, maxMana: u.maxMana, alive: u.alive, permAtk: u.permAtk, permDef: u.permDef, permMaxSta: u.permMaxSta, permMaxMana: u.permMaxMana })),
+    artifacts: run.artifacts.map(a => ({ id: a.id, count: a.count })),
+    grantedLayers: run.grantedLayers.slice(),
+  };
+  closeModal();
+  updateSide();
+  renderMap();
+  if (level) {
+    run.battleLevel = level;
+    resetGame(level);
+    return Promise.resolve();
+  }
+  run.battleLevel = null;
+  openModal('加载关卡', '正在载入本层关卡…', []);
+  return (async () => {
+    try {
+      const lvl = await loadLevelForLayer(run.stageIndex + 1);
+      run.battleLevel = lvl;
+      closeModal();
+      resetGame(lvl);
+    } catch (e) {
+      closeModal();
+      run.path.pop();
+      run.battleLevel = null;
+      run.phase = 'choice';
+      showChoice();
+      showToast(`关卡加载失败：${e.message}`);
+    }
+  })();
+}
+
+function restartBattle() {
+  const b = run.battleBackup;
+  if (b) {
+    b.player.forEach((s, i) => { if (playerUnits[i]) Object.assign(playerUnits[i], s); });
+    run.artifacts = b.artifacts.map(a => ({ id: a.id, count: a.count, inApplied: false, outApplied: false }));
+    run.grantedLayers = b.grantedLayers.slice();
+  }
+  resetGame(run.battleLevel);
+}
+
+function advance() {
+  closeModal();
+  run.stageIndex += 1;
+  if (run.stageIndex >= RUN_LAYERS) {
+    clearSave();
+    run.phase = 'done';
+    updateSide();
+    updateTop();
+    renderMap();
+    openModal('你胜利了', `全部 ${RUN_LAYERS} 层已通关。`, [
+      { label: '回到启动页面', primary: true, onClick: backToStart },
+    ]);
+    return;
+  }
+  showChoice();
+}
+
+function backToStart() {
+  clearSave();
+  closeModal();
+  run.active = false;
+  run.phase = 'start';
+  run.rogue = null;
+  run.stageIndex = 0;
+  run.path = [];
+  run.artifacts = [];
+  run.companions = [];
+  run.luckBonus = 0;
+  run.grantedLayers = [];
+  run.battleLevel = null;
+  playerUnits = [];
+  companionPick = [];
+  startScreen.classList.add('show');
+  updateSide();
+  updateTop();
+  renderMap();
+  renderRelicCard();
+  renderStart();
+}
+
+function addArtifact(id) {
+  const a = ARTIFACTS[id];
+  if (!a) return;
+  const inst = run.artifacts.find(x => x.id === id);
+  if (inst) inst.count += 1;
+  else run.artifacts.push({ id, count: 1, inApplied: false, outApplied: false });
+  if (a.luckBonus) run.luckBonus += a.luckBonus;
+  renderRelicCard();
+}
+
+function artifactKindText(a) {
+  const k = ARTIFACT_KINDS[a.kind];
+  if (a.kind === 'in') return `${k.name}类·${a.timing === 'start' ? '开场' : '行动后'}`;
+  if (a.kind === 'gain') return '获得时生效';
+  return `${k.name}类`;
+}
+
+function renderRelicCard() {
+  relicCard.style.display = run.active ? '' : 'none';
+  relicCount.textContent = run.artifacts.reduce((n, a) => n + a.count, 0);
+  relicList.innerHTML = '';
+  if (!run.artifacts.length) {
+    relicList.innerHTML = '<div class="rd">暂无藏品</div>';
+    return;
+  }
+  for (const inst of run.artifacts) {
+    const a = ARTIFACTS[inst.id];
+    const kind = ARTIFACT_KINDS[a.kind];
+    const active = a.kind === 'in' && inst.inApplied && run.phase === 'battle';
+    const item = document.createElement('div');
+    item.className = 'relic-item';
+    item.innerHTML = `<span class="rn">${a.name}${a.kind === 'once' ? ` ×${inst.count}` : ''}</span>
+      <span class="rk" style="color:${kind.color}">${artifactKindText(a)}${active ? ' · 本场已生效' : ''}</span>
+      <span class="rd">${a.desc}</span>`;
+    relicList.appendChild(item);
+  }
+}
+
+function triggerOutOfBattle() {
+  for (const inst of run.artifacts) {
+    const a = ARTIFACTS[inst.id];
+    if (a.kind === 'out') a.onNodeConfirm?.(inst);
+  }
+}
+
+function triggerBattleStart() {
+  for (const inst of run.artifacts) {
+    const a = ARTIFACTS[inst.id];
+    if (a.kind === 'in' && a.timing === 'start') a.onBattleStart?.(inst);
+  }
+}
+
+function triggerInBattle(actor) {
+  for (const inst of run.artifacts) {
+    const a = ARTIFACTS[inst.id];
+    if (a.kind === 'in' && a.timing === 'action') a.onUnitAct?.(inst, actor);
+  }
+}
+
+function useOnceArtifact(id, target) {
+  const inst = run.artifacts.find(x => x.id === id);
+  if (!inst || inst.count <= 0) return;
+  const actor = currentActor();
+  if (!actor || state.phase !== 'decision' || actor.camp !== 0 || state.onceUsed) return;
+  const a = ARTIFACTS[id];
+  if (a.target && !target) return;
+  state.onceUsed = true;
+  inst.count -= 1;
+  a.use?.(target);
+  if (inst.count <= 0) run.artifacts = run.artifacts.filter(x => x !== inst);
+  pendingRelic = null;
+  updateAll();
+  renderRelicCard();
+}
+
+function pick(arr) {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
+function shuffle(arr) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function rnd(tag) {
+  let h = 2166136261 ^ (run.seed >>> 0);
+  const s = String(tag);
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+  h ^= h >>> 13; h = Math.imul(h, 1274126177); h ^= h >>> 16;
+  return ((h >>> 0) % 1000000) / 1000000;
+}
+
+function pickSeeded(arr, tag) {
+  return arr[Math.floor(rnd(tag) * arr.length) % arr.length];
+}
+
+function shuffleSeeded(arr, tag) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(rnd(tag + ':' + i) * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function grantArtifact(id, opts = {}) {
+  const a = ARTIFACTS[id];
+  if (!a) return { ok: false, reason: '无此藏品' };
+  const total = run.artifacts.reduce((n, x) => n + x.count, 0);
+  if (total >= CONFIG.artifact.capacity) return { ok: false, reason: `藏品已满（${CONFIG.artifact.capacity}）` };
+  if (!opts.ignoreLayer && run.grantedLayers.includes(run.stageIndex)) return { ok: false, reason: '本层已获得过藏品' };
+  if (!run.grantedLayers.includes(run.stageIndex)) run.grantedLayers.push(run.stageIndex);
+  const inst = run.artifacts.find(x => x.id === id);
+  if (inst) inst.count += 1;
+  else run.artifacts.push({ id, count: 1, inApplied: false, outApplied: false });
+  a.onGain?.();
+  renderRelicCard();
+  return { ok: true };
+}
+
+function healParty(n) {
+  playerUnits.filter(u => u.alive).forEach(u => { u.hp = Math.min(u.maxHp, u.hp + n); });
+}
+
+function growPartyMaxHp(n) {
+  playerUnits.forEach(u => {
+    u.permMaxHp = (u.permMaxHp || 0) + n;
+    u.maxHp += n;
+    if (u.alive) u.hp = Math.min(u.maxHp, u.hp + n);
+  });
+}
+
+function restoreBattleStats() {
+  playerUnits.forEach(u => {
+    const s = u.battleSnapshot;
+    if (!s) return;
+    u.atk = s.atk;
+    u.def = s.def;
+    if (s.maxDef !== undefined) u.maxDef = s.maxDef;
+    u.maxSta = s.maxSta;
+    u.maxMana = s.maxMana;
+    u.sta = Math.min(u.sta, u.maxSta);
+    u.mana = Math.min(u.mana, u.maxMana);
+    u.battleSnapshot = null;
+  });
+}
+
+function drawFortune() {
+  const f = pickFortune('fortune:' + run.stageIndex);
+  f.apply();
+  log(`求签：${f.name} · ${f.desc}`, 'spell');
+  updateAll();
+  renderRelicCard();
+  openModal('求签', `<b class="fortune-name">${f.name}</b><br>${f.desc}`, []);
+  modal.classList.add('click-close');
+  const close = () => {
+    modal.removeEventListener('pointerdown', close);
+    modal.classList.remove('click-close');
+    closeModal();
+    startDeployment();
+  };
+  setTimeout(() => modal.addEventListener('pointerdown', close), 60);
+}
+
+function showEvent() {
+  run.phase = 'story';
+  updateSide();
+  const pool = shuffleSeeded(TREASURES, 'event:' + run.stageIndex).slice(0, 3);
+  const cards = pool.map(id => {
+    const a = ARTIFACTS[id];
+    return `<button class="pick-card" data-treasure="${id}">
+      <div class="pc-name">${a.name}</div>
+      <div class="pc-kind" style="color:${ARTIFACT_KINDS[a.kind].color}">${artifactKindText(a)}</div>
+      <div class="pc-desc">${a.desc}</div>
+    </button>`;
+  }).join('');
+  openModal('奇遇 · 宝物三选一', `<div class="pick-grid three">${cards}</div>
+    <div class="muted" style="margin-top:10px">每层最多获得一件藏品，藏品上限 ${CONFIG.artifact.capacity}。</div>`, []);
+  modalBody.querySelectorAll('[data-treasure]').forEach(btn => {
+    btn.onclick = () => {
+      const id = btn.dataset.treasure;
+      const r = grantArtifact(id);
+      const a = ARTIFACTS[id];
+      openModal('奇遇', r.ok
+        ? `获得【${a.name}】<br><span class="muted">${a.desc}</span>`
+        : `未能获得（${r.reason}）<br><span class="muted">${a.name} · ${a.desc}</span>`,
+      [{ label: '下一步', primary: true, onClick: advance }]);
+      updateTop();
+      renderMap();
+      renderRelicCard();
+    };
+  });
+}
+
+function doRest() {
+  run.phase = 'story';
+  updateSide();
+  growPartyMaxHp(1);
+  updateAll();
+  openModal('休息', '你选择了休息。<br>全队生命上限 +1（永久）。', [
+    { label: '下一步', primary: true, onClick: advance },
+  ]);
+}
+
+function settleDone(text) {
+  updateAll();
+  renderRelicCard();
+  openModal('结算完成', text, [{ label: '下一步', primary: true, onClick: advance }]);
+}
+
+function settlementLuckyIndex() {
+  const chance = Math.max(0, Math.min(100, currentLuck() / 2)) / 100;
+  if (rnd('settleBuff:' + run.stageIndex) >= chance) return -1;
+  return Math.floor(rnd('settleBuffPick:' + run.stageIndex) * 3) % 3;
+}
+
+function showSettlement() {
+  run.phase = 'settle';
+  const lucky = settlementLuckyIndex();
+  const hpGain = lucky === 0 ? 2 : 1;
+  const atkGain = lucky === 1 ? 4 : 2;
+  const buttons = [
+    {
+      label: `全队生命上限 +${hpGain}${lucky === 0 ? '（幸运）' : ''}`,
+      lucky: lucky === 0,
+      onClick: () => { growPartyMaxHp(hpGain); settleDone(`全队生命上限 +${hpGain}（永久）`); },
+    },
+    {
+      label: `随机一名角色攻击力 +${atkGain}${lucky === 1 ? '（幸运）' : ''}`,
+      lucky: lucky === 1,
+      onClick: () => {
+        const target = pickSeeded(playerUnits, 'settleAtkTarget:' + run.stageIndex);
+        if (!target) return;
+        target.permAtk += atkGain;
+        target.atk += atkGain;
+        settleDone(`${target.name} 攻击力 +${atkGain}（永久）`);
+      },
+    },
+    {
+      label: lucky === 2 ? '获得两件随机宝物（幸运）' : '获得随机宝物',
+      lucky: lucky === 2,
+      onClick: () => {
+        if (lucky === 2) {
+          const ids = shuffleSeeded(TREASURES, 'settleItems:' + run.stageIndex).slice(0, 2);
+          const got = [];
+          for (const id of ids) {
+            const r = grantArtifact(id, { ignoreLayer: true });
+            if (r.ok) got.push(ARTIFACTS[id].name);
+          }
+          settleDone(got.length ? `获得【${got.join('】、【')}】` : '未能获得（藏品已满）');
+          return;
+        }
+        const id = pickSeeded(TREASURES, 'settleItem:' + run.stageIndex);
+        const r = grantArtifact(id, { ignoreLayer: true });
+        settleDone(r.ok ? `获得【${ARTIFACTS[id].name}】` : `未能获得（${r.reason}）`);
+      },
+    },
+  ];
+  openModal('战斗结算', lucky >= 0
+    ? '选择一项奖励：<div class="lucky-tip">幸运触发：高亮项获得强化</div>'
+    : '选择一项奖励：', buttons);
+}
+
+let companionPick = [];
+let swordPick = null;
+
+function showSwordPick() {
+  run.phase = 'sword';
+  swordPick = null;
+  const pool = SWORD_IDS.slice();
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  const picks = pool.slice(0, 3);
+  const cards = picks.map(id => {
+    const a = ARTIFACTS[id];
+    const k = ARTIFACT_KINDS[a.kind];
+    return `<button class="pick-card" data-art="${id}">
+      <div class="pc-portrait"><img src="${encodeURI(SWORD_IMAGES[id])}" alt="${a.name}图" /></div>
+      <div class="pc-name">${a.name}</div>
+      <div class="pc-kind" style="color:${k.color}">${artifactKindText(a)}</div>
+      <div class="pc-desc">${a.desc}</div>
+    </button>`;
+  }).join('');
+  openModal('选择宝剑', `<div class="pick-grid three sword">${cards}</div>
+    <div class="muted" style="margin-top:10px">三选一，选中后点「确定」。</div>`, [
+    { label: '确定', primary: true, onClick: () => { if (swordPick) { addArtifact(swordPick); showCompanionPick(); } } },
+  ]);
+  modal.classList.add('sword-pick');
+  const confirmBtn = modalActions.querySelector('button');
+  confirmBtn.disabled = true;
+  confirmBtn.style.opacity = '.4';
+  modalBody.querySelectorAll('.pick-card').forEach(btn => {
+    btn.onclick = () => {
+      swordPick = btn.dataset.art;
+      modalBody.querySelectorAll('.pick-card').forEach(b => b.classList.toggle('selected', b === btn));
+      confirmBtn.disabled = false;
+      confirmBtn.style.opacity = '';
+    };
+  });
+}
+
+function showCompanionPick() {
+  run.phase = 'companion';
+  companionPick = [];
+  const cards = COMPANIONS.map(c => `
+    <button class="pick-card" data-comp="${c.id}">
+      <div class="pc-portrait"><img src="${encodeURI(PORTRAIT_BY_CHAR[c.id])}" alt="${c.name}立绘" /></div>
+      <div class="pc-head"><span class="pc-attr" style="--attr:${ATTR_HEX[c.attr]}">${ATTR_NAME[c.attr]}属性</span><span>${c.name}</span></div>
+    </button>`).join('');
+  openModal('五选三 · 选择队友', `<div class="pick-grid four">${cards}</div>
+    <div class="muted" style="margin-top:10px">主角固定上阵；从四名队友中选择两位（按点击顺序）。</div>`, [
+    { label: '确定', primary: true, onClick: () => { if (companionPick.length === 2) beginRun(); } },
+  ]);
+  modal.classList.add('companion-pick');
+  const confirmBtn = modalActions.querySelector('button');
+  confirmBtn.disabled = true;
+  confirmBtn.style.opacity = '.4';
+  modalBody.querySelectorAll('.pick-card').forEach(btn => {
+    btn.onclick = () => {
+      const id = btn.dataset.comp;
+      const idx = companionPick.indexOf(id);
+      if (idx >= 0) {
+        companionPick.splice(idx, 1);
+        btn.classList.remove('selected');
+      } else if (companionPick.length < 2) {
+        companionPick.push(id);
+        btn.classList.add('selected');
+      }
+      const ok = companionPick.length === 2;
+      confirmBtn.disabled = !ok;
+      confirmBtn.style.opacity = ok ? '' : '.4';
+    };
+  });
+}
+
+function beginRun() {
+  run.companions = companionPick.map(id => COMPANIONS.find(c => c.id === id)).filter(Boolean).slice(0, 2);
+  run.rogue = new RogueRun(run.difficulty, run.luckBonus);
+  run.active = true;
+  run.stageIndex = 0;
+  run.path = [];
+  run.grantedLayers = [];
+  run.seed = Math.floor(Math.random() * 1e9);
+  createPlayerUnits();
+  applyStartSwordPermanent();
+  closeModal();
+  updateSide();
+  updateTop();
+  renderMap();
+  renderRelicCard();
+  showChoice();
+}
+
+function startRun() {
+  clearSave();
+  run.artifacts = [];
+  run.companions = [];
+  run.luckBonus = 0;
+  run.heroAttr = 0;
+  run.rogue = null;
+  run.active = false;
+  run.stageIndex = 0;
+  run.path = [];
+  run.grantedLayers = [];
+  run.battleLevel = null;
+  playerUnits = [];
+  companionPick = [];
+  startScreen.classList.remove('show');
+  updateSide();
+  renderRelicCard();
+  showAttrPick();
+}
+
+let heroAttrPick = null;
+
+function showAttrPick() {
+  run.phase = 'attr';
+  heroAttrPick = null;
+  const order = [0, 2, 1, 3, 4];
+  const cx = 150, cy = 150, r = 104;
+  const pts = order.map((attr, i) => {
+    const a = -Math.PI / 2 + i * Math.PI * 2 / 5;
+    return { attr, x: cx + Math.cos(a) * r, y: cy + Math.sin(a) * r };
+  });
+  const star = [0, 2, 4, 1, 3, 0].map(i => `${pts[i].x.toFixed(1)},${pts[i].y.toFixed(1)}`).join(' ');
+  const nodes = pts.map(p => `
+    <g class="attr-node" data-attr="${p.attr}">
+      <circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="24" fill="${ATTR_HEX[p.attr]}" fill-opacity="0.16" stroke="${ATTR_HEX[p.attr]}" stroke-width="2"/>
+      <text x="${p.x.toFixed(1)}" y="${(p.y + 1).toFixed(1)}" text-anchor="middle" dominant-baseline="middle" font-size="20" fill="${ATTR_HEX[p.attr]}">${ATTR_NAME[p.attr]}</text>
+    </g>`).join('');
+  openModal('选择主属性', `
+    <div class="attr-wheel">
+      <svg viewBox="0 0 300 300">
+        <polygon points="${star}" fill="none" stroke="#2f445f" stroke-width="1.5"/>
+        ${nodes}
+      </svg>
+    </div>
+`, [
+    { label: '确定', primary: true, onClick: () => { if (heroAttrPick !== null) { run.heroAttr = heroAttrPick; showSwordPick(); } } },
+  ]);
+  const confirm = modalActions.querySelector('button');
+  confirm.disabled = true;
+  confirm.style.opacity = '.4';
+  modalBody.querySelectorAll('.attr-node').forEach(g => {
+    g.onclick = () => {
+      heroAttrPick = Number(g.dataset.attr);
+      modalBody.querySelectorAll('.attr-node').forEach(n => n.classList.toggle('selected', n === g));
+      confirm.disabled = false;
+      confirm.style.opacity = '';
+    };
+  });
+}
+
+diffUp.addEventListener('click', () => {
+  run.difficulty = Math.min(10, run.difficulty + 1);
+  renderStart();
+});
+diffDown.addEventListener('click', () => {
+  run.difficulty = Math.max(1, run.difficulty - 1);
+  renderStart();
+});
+startBtn.addEventListener('click', startRun);
+continueBtn.addEventListener('click', restoreRun);
+rulesBtn.addEventListener('click', openRulesModal);
+rulesClose.addEventListener('click', closeRulesModal);
+rulesModal.addEventListener('pointerdown', ev => { if (ev.target === rulesModal) closeRulesModal(); });
+window.addEventListener('keydown', ev => {
+  if (ev.key === 'Escape' && rulesModal.classList.contains('show')) closeRulesModal();
+});
+relicHead.addEventListener('click', () => relicCard.classList.toggle('collapsed'));
+
+/* ---------------- 启动 ---------------- */
+let playerUnits = [];
+
+function heroSkillList() {
+  const list = ALL_SKILLS.slice();
+  const extra = ELEMENT_SPELL_IDS[run.heroAttr ?? 0];
+  if (extra !== undefined && !list.includes(extra)) list.push(extra);
+  return list;
+}
+
+function createPlayerUnits() {
+  const heroAttr = run.heroAttr ?? 0;
+  const chosen = run.companions.length ? run.companions.slice(0, 2) : COMPANIONS.slice(0, 2);
+  const defs = [
+    { id: 'hero', name: '主角', attr: heroAttr, skills: heroSkillList(), stats: CONFIG.player },
+    ...chosen.map(c => ({ ...c, skills: [...BASIC_SKILLS, ...c.special] })),
+  ];
+  playerUnits = defs.map((d, i) => {
+    const u = new Unit(i, d.name, 0, d.attr, spawnCell(d.attr), d.skills.slice(), { ...d.stats });
+    u.charId = d.id;
+    return u;
+  });
+}
+
+function applyStartSwordPermanent() {
+  for (const id of ['ganjiang', 'moye']) {
+    if (!run.artifacts.some(a => a.id === id)) continue;
+    ARTIFACTS[id].onGain?.();
+  }
+}
+
+function scaleLevelEnemyStats(e, layer, isBoss) {
+  const diffMul = CONFIG.scaling.base + (run.difficulty - 1) * CONFIG.scaling.difficulty;
+  const layerMul = isBoss ? 1 : 1 + (layer - 1) * CONFIG.scaling.layer;
+  const scale = v => {
+    const n = Number(v);
+    if (!Number.isFinite(n)) return 0;
+    return Math.max(0, Math.floor(Math.floor(n * diffMul) * layerMul));
+  };
+  return {
+    hp: Math.max(1, scale(e.hp)),
+    atk: scale(e.atk),
+    def: scale(e.def),
+    sta: scale(e.sta),
+    mana: scale(e.mana),
+    atkRange: Math.max(1, Math.round(Number(e.atkRange) || 1)),
+  };
+}
+
+function applyLevelCells(level) {
+  for (let i = 0; i < cells.length; i++) {
+    const v = Array.isArray(level.cells) ? level.cells[i] : null;
+    const attr = Number.isInteger(v) && v >= 0 && v <= 4 ? v : null;
+    cells[i].baseAttr = attr;
+    cells[i].attr = attr;
+  }
+}
+
+const BOSS_DIAMOND_IDS = [1, 2, 3, 41];
+
+function createBoss(id, partCells, stats, attr = 0) {
+  const boss = new Unit(id, 'BOSS', 1, attr, partCells[0], [], { ...stats }, 5);
+  boss.isBoss = true;
+  boss.cells = partCells.slice();
+  boss.bossParts = partCells.map((c, i) => ({ cell: c, hit: false, pending: false, index: i }));
+  boss.enraged = false;
+  return boss;
+}
+
+function buildLevelEnemies(level, layer) {
+  const out = [];
+  const used = new Set();
+  const baseId = playerUnits.length;
+  const list = Array.isArray(level.enemies) ? level.enemies : [];
+  for (const e of list) {
+    if (!e || typeof e !== 'object') continue;
+    const tplId = ENEMY_TEMPLATES[Number(e.template)] ? Number(e.template) : 1;
+    const isBoss = tplId === 5 || (Array.isArray(e.cells) && e.cells.length === 4);
+    const attr = Number.isInteger(e.attr) && e.attr >= 0 && e.attr <= 4 ? e.attr : 0;
+    if (isBoss) {
+      const ids = Array.isArray(e.cells) && e.cells.length === 4 ? e.cells : BOSS_DIAMOND_IDS;
+      const partCells = ids.map(id => cells[id]).filter(Boolean);
+      if (partCells.length !== 4) throw new Error(`BOSS 四格位置无效（${level.name || '关卡'}）`);
+      if (partCells.some(c => used.has(c.id))) throw new Error(`BOSS 四格位置重叠（${level.name || '关卡'}）`);
+      partCells.forEach(c => used.add(c.id));
+      out.push(createBoss(baseId + out.length, partCells, scaleLevelEnemyStats(e, layer, true), attr));
+    } else {
+      const c = cells[e.cell];
+      if (!c || used.has(c.id)) throw new Error(`敌人位置无效或重叠（${level.name || '关卡'}）`);
+      used.add(c.id);
+      const tpl = ENEMY_TEMPLATES[tplId] || ENEMY_TEMPLATES[1];
+      const nm = tplId === 1 ? `敌人${out.length + 1}` : `${tpl.unitName}${out.length + 1}`;
+      out.push(new Unit(baseId + out.length, nm, 1, attr, c, BASIC_SKILLS.slice(), scaleLevelEnemyStats(e, layer, false), tplId));
+    }
+  }
+  if (!out.length) throw new Error(`关卡没有敌人（${level.name || '关卡'}）`);
+  return out;
+}
+
+function resetGame(level = run.battleLevel) {
+  if (!level) {
+    showToast('没有可加载的关卡');
+    return;
+  }
+  units.forEach(u => { if (u.mesh) scene.remove(u.mesh); });
+  hideDossier();
+  lastPlayerDamagerId = null;
+  const layer = run.stageIndex + 1;
+  applyLevelCells(level);
+  const enemies = buildLevelEnemies(level, layer);
+
+  playerUnits.forEach(u => {
+    u.cell = spawnCell(u.attr);
+    u.status = new UnitStatus();
+    u.skipped = false;
+    u.damageThisRound = 0;
+    u.damageImmune = false;
+    u.skillCostUses = {};
+    u.skillOnceUsed = {};
+    u.instant = true;
+    u.hp = u.maxHp;
+    u.sta = u.maxSta;
+    u.mana = u.maxMana;
+    u.battleSnapshot = { atk: u.atk, def: u.def, maxDef: u.maxDef, maxSta: u.maxSta, maxMana: u.maxMana };
+  });
+  enemies.forEach(e => { e.instant = true; });
+  units = [...playerUnits, ...enemies];
+
+  Object.assign(state, {
+    round: 1, phase: 'deploy', over: false, onceUsed: false,
+    decisions: {}, currentUnitId: null, winner: null, reason: null,
+  });
+  draft = null;
+  pendingRelic = null;
+  deployment = null;
+  hoverSkillId = null;
+  lastSkill = null;
+  banner.classList.remove('show');  logEl.innerHTML = '';
+  log(`关卡：${level.name || level.file || '未知'} · ${level.type || '战斗'}`, 'round');
+  units.forEach(u => {
+    u.enterSeq = ++enterSeqCounter;
+    u.mesh = buildUnitMesh(u);
+    scene.add(u.mesh);
+  });
+  run.artifacts.forEach(a => { a.inApplied = false; });
+  layoutUnits();
+  refreshCellColors();
+  drawFortune();
+}
+
+function cellOccupiedByUnit(cell, exceptUnit) {
+  return units.some(u => u !== exceptUnit && unitOccupiesCell(u, cell));
+}
+
+function enemyOnCell(cell) {
+  return units.some(u => u.camp === 1 && unitOccupiesCell(u, cell));
+}
+
+function deployUnit() {
+  return deployment ? deployment.order[deployment.index] || null : null;
+}
+
+function deployReady() {
+  return !!deployment && deployment.index >= deployment.order.length;
+}
+
+function deployableCells(u) {
+  return cells.filter(c => !cellOccupiedByUnit(c, u));
+}
+
+function startDeployment() {
+  const order = playerUnits.filter(u => u.alive);
+  const defaults = new Map();
+  const used = new Set();
+  for (const u of order) {
+    let cell = spawnCell(u.attr);
+    if (!cell || used.has(cell.id) || enemyOnCell(cell)) {
+      const from = cell || cells[0];
+      const free = cells
+        .filter(c => !used.has(c.id) && !enemyOnCell(c))
+        .sort((a, b) => stepDist(a, from) - stepDist(b, from));
+      cell = free[0] || cell;
+    }
+    if (!cell) continue;
+    used.add(cell.id);
+    defaults.set(u.id, cell.id);
+  }
+  deployment = { order, index: 0, defaults };
+  if (!order.length) { finishDeployment(true); return; }
+  for (const u of order) {
+    const c = cells[defaults.get(u.id)];
+    if (!c) continue;
+    u.instant = true;
+    moveUnit(u, c);
+  }
+  layoutUnits();
+  state.phase = 'deploy';
+  log('—— 布阵阶段 ——', 'round');
+  log('请依次为主角团选择起始位置', 'note');
+  updateAll();
+}
+
+function placeCurrent(cell) {
+  const u = deployUnit();
+  if (!u || !cell) return;
+  if (cellOccupiedByUnit(cell, u)) return;
+  moveUnit(u, cell);
+  log(`布阵：${u.name} → ${cell.label}`, 'note');
+  deployment.index += 1;
+  updateAll();
+}
+
+function selectDeployUnit(u) {
+  if (!deployment) return;
+  const i = deployment.order.indexOf(u);
+  if (i < 0) return;
+  deployment.index = i;
+  updateAll();
+}
+
+function resetDeployment() {
+  if (!deployment) return;
+  for (const u of deployment.order) {
+    const c = cells[deployment.defaults.get(u.id)];
+    if (!c) continue;
+    u.instant = true;
+    moveUnit(u, c);
+  }
+  deployment.index = 0;
+  layoutUnits();
+  updateAll();
+}
+
+function finishDeployment(silent) {
+  if (!silent && !deployReady()) return;
+  if (!silent) log('布阵完成，战斗开始', 'round');
+  if (units.some(u => u.isBoss)) {
+    log('【BOSS · 双头食人花】<br>鞭挞：2魔，攻击至多两名目标；穿刺：2魔，无视防御；压制：2魔，1点伤害并施加无力；爆发：2魔，全部格转为 BOSS 属性；抽取：抽取每名敌人 1 魔并回复自身；反击：防御时反伤 1 点并回复 1 魔。<br>四格根须首次受击后，回合末各损失 1/8 最大生命；半血后狂暴，攻击 +50%。', 'boss');
+  }
+  deployment = null;
+  triggerBattleStart();
+  startRound();
+  updateAll();
+}
+
+restartBtn.addEventListener('click', () => {
+  if (!(run.active && run.phase === 'battle')) return;
+  restartBattle();
+  onResize();
+});
+bannerBtn.addEventListener('click', () => { resetGame(run.battleLevel); onResize(); });
+
+const heartbeat = () => fetch('/__hb', { cache: 'no-store' }).catch(() => {});
+heartbeat();
+const beatTimer = setInterval(heartbeat, 2000);
+window.addEventListener('pagehide', () => {
+  try { navigator.sendBeacon('/__bye'); } catch (e) {}
+});
+
+shutdownBtn.addEventListener('click', async () => {
+  if (serverDown) return;
+  serverDown = true;
+  shutdownBtn.disabled = true;
+  shutdownBtn.textContent = '正在关闭…';
+  clearInterval(beatTimer);
+  try { await fetch('/__shutdown', { cache: 'no-store' }); } catch (e) {}
+  shutdownBtn.textContent = '服务已关闭';
+  updateAll();
+});
+
+function animate() {
+  requestAnimationFrame(animate);
+  const t = performance.now() / 1000;
+  for (const u of units) {
+    if (u.mesh && u.target) u.mesh.position.lerp(u.target, 0.2);
+    if (u.mesh && u.alive) {
+      const gems = u.mesh.userData.gems || [u.mesh.userData.gem];
+      for (const gem of gems) if (gem) gem.rotation.y = t * 0.6;
+    }
+  }
+  if (state.currentUnitId !== null && !state.over) {
+    const u = units[state.currentUnitId];
+    if (u && u.mesh && u.alive) {
+      const s = 1 + Math.sin(t * 4) * 0.03;
+      u.mesh.children[2].scale.setScalar(s);
+    }
+  }
+  renderer.render(scene, camera);
+}
+
+window.__game = {
+  cells,
+  get units() { return units; },
+  get state() { return state; },
+  get run() { return run; },
+  get playerUnits() { return playerUnits; },
+  get deployment() { return deployment; },
+  deployableCells,
+  finishDeployment,
+  commit: d => commit(d),
+  validTargets,
+  validCells,
+  stepDist,
+  unitGap,
+  skills: SKILL_MAP,
+  modifier: modifierParts,
+  enemyTemplates: ENEMY_TEMPLATES,
+  enemyActions: ENEMY_ACTIONS,
+  enemyMethodIndex: ENEMY_METHOD_INDEX,
+  bossDiamond: BOSS_DIAMOND_IDS,
+  createBoss,
+  moveUnit,
+  layoutUnits,
+};
+
+onResize();
+renderStart();
+updateSide();
+renderMap();
+renderRelicCard();
+updateTop();
+startScreen.classList.add('show');
+animate();
+</script>
+</body>
+</html>

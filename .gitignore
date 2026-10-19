@@ -1,0 +1,19 @@
+# Local tool configuration (contains credentials)
+opencode.json
+配置/
+
+# Runtime logs
+日志/
+*.log
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Test build cache
+测试脚本/.build/
+
+# OS metadata
+.DS_Store
+Thumbs.db
+desktop.ini

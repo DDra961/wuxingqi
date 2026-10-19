@@ -1,0 +1,1080 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>五行棋盘 · 关卡编辑器</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: radial-gradient(circle at 50% 28%, #101a2b 0%, #05080e 76%);
+    color: #cfe0f6; font: 14px/1.5 "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+  button, input, select { font-family: inherit; }
+  button { cursor: pointer; }
+
+  .topbar {
+    flex: 0 0 auto; display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+    padding: 11px 20px; background: rgba(9, 15, 24, .94);
+    border-bottom: 1px solid #1b2739; box-shadow: 0 8px 24px rgba(0, 0, 0, .28);
+    position: relative; z-index: 10;
+  }
+  .brand { font-size: 18px; font-weight: 700; letter-spacing: 4px; color: #e8f0ff; white-space: nowrap; }
+  .brand span { color: #5d7fae; font-size: 11px; letter-spacing: 2px; margin-left: 8px; font-weight: 400; }
+  .meta { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .field { display: flex; align-items: center; gap: 7px; font-size: 12px; color: #8fa6c8; }
+  .field input, .field select {
+    background: #121d2c; border: 1px solid #24344a; color: #dbe9ff;
+    border-radius: 7px; padding: 6px 9px; font-size: 12px; outline: none;
+  }
+  .field input { width: 170px; }
+  .field select { min-width: 104px; }
+  .field input:focus, .field select:focus { border-color: #4a7fb5; }
+  .actions { display: flex; align-items: center; gap: 8px; margin-left: auto; flex-wrap: wrap; }
+  .tool-btn {
+    padding: 7px 12px; border-radius: 7px; border: 1px solid #2c3d56;
+    background: #172234; color: #c6d6ea; font-size: 12px; transition: all .12s;
+  }
+  .tool-btn:hover { background: #22334a; border-color: #4a7fb5; color: #fff; }
+  .tool-btn.primary {
+    background: linear-gradient(180deg, #3f7fb5, #2c5f8f);
+    border-color: #6fa5d6; color: #f2f8ff; font-weight: 700;
+  }
+  .tool-btn.primary:hover { background: linear-gradient(180deg, #4a90c9, #33679a); }
+  .tool-btn.danger { border-color: #5a3038; color: #e8a0a8; }
+  .tool-btn.danger:hover { background: #2a1a20; border-color: #8a4b58; }
+  #saveState { font-size: 10px; color: #5d7fae; white-space: nowrap; }
+  .env-warning {
+    flex: 0 0 auto; display: none; align-items: center; gap: 12px; flex-wrap: wrap;
+    padding: 9px 20px; background: rgba(60, 35, 12, .96);
+    border-bottom: 1px solid #6b5320; color: #ffd9a0; font-size: 12px; line-height: 1.6;
+  }
+  .env-warning.show { display: flex; }
+  .env-warning b { color: #ffe6b0; }
+  .env-warning .tool-btn { padding: 5px 10px; border-color: #6b5320; color: #ffd9a0; background: #2a1f0e; }
+  .env-warning .tool-btn:hover { background: #3a2a12; border-color: #a37a2c; color: #ffe6b0; }
+
+  main { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 390px; }
+  .board-wrap {
+    min-height: 0; min-width: 0; padding: 14px 18px 12px;
+    display: flex; flex-direction: column; align-items: center; gap: 8px;
+  }
+  .board-shell { flex: 1 1 auto; min-height: 0; width: 100%; display: flex; align-items: center; justify-content: center; }
+  #board {
+    width: min(100%, 860px, calc(100vh - 210px));
+    height: auto; aspect-ratio: 1 / 1; display: block;
+    touch-action: none; user-select: none; -webkit-user-select: none;
+  }
+  #board text { pointer-events: none; user-select: none; }
+  .cell { cursor: pointer; }
+  .cell circle { transition: filter .12s; }
+  .cell:hover circle { filter: brightness(1.35); }
+  .token { cursor: grab; }
+  .token:active { cursor: grabbing; }
+  .token.dragging { opacity: .88; }
+  .boss-part { cursor: grab; transition: fill-opacity .12s; }
+  .boss-part:hover { fill-opacity: .18; }
+  .legend { display: flex; align-items: center; justify-content: center; gap: 14px; flex-wrap: wrap; font-size: 12px; color: #8fa6c8; }
+  .legend i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 5px; vertical-align: middle; }
+  .board-hint { font-size: 12px; color: #6f86a6; text-align: center; }
+
+  .enemy-panel {
+    min-height: 0; display: flex; flex-direction: column;
+    border-left: 1px solid #1b2739; background: rgba(10, 16, 26, .72);
+  }
+  .panel-head {
+    flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between;
+    gap: 12px; padding: 14px 16px; border-bottom: 1px solid #1b2739;
+  }
+  .panel-head h2 { margin: 0; font-size: 14px; letter-spacing: 2px; color: #cfe0f6; font-weight: 600; }
+  .panel-head h2 b { color: #5fa8d8; font-weight: 700; }
+  .panel-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+  #addEnemy {
+    padding: 8px 12px; border-radius: 8px; border: 1px solid #6fa5d6;
+    background: linear-gradient(180deg, #3f7fb5, #2c5f8f); color: #f2f8ff;
+    font-size: 12px; font-weight: 700; white-space: nowrap;
+  }
+  #addEnemy:hover { background: linear-gradient(180deg, #4a90c9, #33679a); }
+  #addBoss {
+    padding: 8px 12px; border-radius: 8px; border: 1px solid #a37a2c;
+    background: linear-gradient(180deg, #d9a84a, #a97a22); color: #1a1306;
+    font-size: 12px; font-weight: 700; white-space: nowrap;
+  }
+  #addBoss:hover { background: linear-gradient(180deg, #e8ba5e, #b98a2c); }
+  #enemyList {
+    flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 12px;
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  #enemyList::-webkit-scrollbar { width: 7px; }
+  #enemyList::-webkit-scrollbar-thumb { background: #22304a; border-radius: 4px; }
+  .empty { padding: 32px 16px; text-align: center; color: #5d7fae; font-size: 12px; line-height: 2; }
+  .empty span { color: #475e7d; font-size: 11px; }
+
+  .enemy-card {
+    --tpl: #9fb4d1;
+    flex: 0 0 auto; padding: 10px 12px 12px; border-radius: 12px;
+    background: #0f1826; border: 1px solid #223146; transition: border-color .12s, box-shadow .12s;
+  }
+  .enemy-card:hover { border-color: #2f4763; }
+  .enemy-card.selected { border-color: var(--tpl); box-shadow: 0 0 0 1px var(--tpl) inset, 0 8px 20px rgba(0, 0, 0, .3); }
+  .ec-head { display: flex; align-items: center; gap: 8px; }
+  .ec-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--tpl); box-shadow: 0 0 8px var(--tpl); flex: 0 0 auto; }
+  .ec-id { font-size: 13px; font-weight: 700; color: #e8f0ff; white-space: nowrap; }
+  .ec-tpl { font-size: 10px; color: var(--tpl); }
+  .ec-pos { margin-left: auto; font-size: 10px; color: #6f86a6; white-space: nowrap; }
+  .ec-del {
+    width: 22px; height: 22px; border-radius: 6px; border: 1px solid #3d2a33;
+    background: #241a1f; color: #c79aa4; font-size: 14px; line-height: 1;
+  }
+  .ec-del:hover { background: #33202a; border-color: #6b3d4a; color: #f0c3cc; }
+  .ec-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 10px; margin-top: 10px; }
+  .ec-fields label { display: flex; flex-direction: column; gap: 4px; font-size: 10px; color: #7f93b0; }
+  .ec-fields input, .ec-fields select {
+    width: 100%; padding: 6px 8px; border-radius: 7px; background: #121d2c;
+    border: 1px solid #24344a; color: #dbe9ff; font-size: 12px; outline: none;
+  }
+  .ec-fields input:focus, .ec-fields select:focus { border-color: #4a7fb5; }
+  .ec-fields input[type="number"] { appearance: textfield; -moz-appearance: textfield; }
+  .ec-fields input[type="number"]::-webkit-inner-spin-button { opacity: .45; }
+
+  #toast {
+    position: fixed; top: 78px; left: 50%; z-index: 40;
+    transform: translateX(-50%) translateY(-8px); opacity: 0; pointer-events: none;
+    padding: 8px 16px; border-radius: 20px; font-size: 12px; color: #ffe6b0;
+    background: rgba(40, 30, 12, .95); border: 1px solid #6b5320;
+    transition: opacity .18s, transform .18s; white-space: nowrap;
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  #toast.bad { color: #ffb3b3; border-color: #6b3d4a; background: rgba(45, 20, 26, .96); }
+
+  @media (max-width: 980px) {
+    body { overflow: auto; }
+    main { grid-template-columns: 1fr; }
+    .board-wrap { padding: 10px 12px; }
+    .enemy-panel { border-left: none; border-top: 1px solid #1b2739; min-height: 320px; }
+    #enemyList { max-height: 50vh; }
+    .actions { margin-left: 0; }
+  }
+</style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">五行棋盘 <span>关卡编辑器</span></div>
+    <div class="meta">
+      <label class="field">关卡名 <input id="levelName" maxlength="24" placeholder="未命名关卡"></label>
+      <label class="field">类型 <select id="levelType"></select></label>
+    </div>
+    <div class="actions">
+      <button class="tool-btn" id="newBtn">新建</button>
+      <button class="tool-btn primary" id="publishBtn" title="保存到项目下的 关卡集 文件夹">保存到关卡集</button>
+      <button class="tool-btn" id="importBtn" title="从 关卡集 文件夹或本机选择 JSON">导入 JSON</button>
+      <input id="importFile" type="file" accept=".json,application/json" hidden>
+      <span id="saveState">未暂存</span>
+    </div>
+  </header>
+
+  <div id="envWarning" class="env-warning">
+    <span id="envWarningText"></span>
+    <button class="tool-btn" id="envDownload">下载备份</button>
+  </div>
+
+  <main>
+    <section class="board-wrap">
+      <div class="board-shell">
+        <svg id="board" viewBox="-380 -380 760 760" aria-label="五边形棋盘"></svg>
+      </div>
+      <div class="legend">
+        <span><i style="background:#2c3d56"></i>无属性</span>
+        <span><i style="background:#e8c05a"></i>金</span>
+        <span><i style="background:#5fbf7a"></i>木</span>
+        <span><i style="background:#4e8fe8"></i>水</span>
+        <span><i style="background:#ee6a55"></i>火</span>
+        <span><i style="background:#a9744f"></i>土</span>
+      </div>
+      <div class="board-hint">51 格 · 点击格子循环切换属性 · 拖动敌人标记调整位置</div>
+    </section>
+
+    <aside class="enemy-panel">
+      <div class="panel-head">
+        <h2>敌人列表 <b id="enemyCount">0</b></h2>
+        <div class="panel-actions">
+          <button id="addEnemy">+ 新增敌人</button>
+          <button id="addBoss">+ 新增 BOSS</button>
+        </div>
+      </div>
+      <div id="enemyList"></div>
+    </aside>
+  </main>
+
+  <div id="toast"></div>
+
+<script>
+const R_OUT = 5 / (2 * Math.sin(Math.PI / 5));
+const SECTOR = Math.PI * 2 / 5;
+const SCALE = 80;
+const CELL_COUNT = 51;
+const SAVE_KEY = 'wuxing_level_editor_v1';
+
+const ATTR_NAME = ['金', '木', '水', '火', '土'];
+const ATTR_HEX = ['#e8c05a', '#5fbf7a', '#4e8fe8', '#ee6a55', '#a9744f'];
+const REGION_ATTR = [0, 2, 1, 3, 4];
+const LEVEL_TYPES = ['大平面', '人海', '攻坚', '地形杀', '机制怪', '前后排', 'BOSS'];
+const TEMPLATES = {
+  1: { name: '无特殊', color: '#9fb4d1', base: { hp: 1, atk: 1, def: 1, sta: 1, mana: 1, atkRange: 1 } },
+  2: { name: '腐蚀', color: '#7fc8a8', base: { hp: 1, atk: 1, def: 1, sta: 1, mana: 1, atkRange: 1 } },
+  3: { name: '嘲讽', color: '#5fa8d8', base: { hp: 1, atk: 1, def: 1, sta: 1, mana: 1, atkRange: 1 } },
+  4: { name: '变换', color: '#b79df0', base: { hp: 1, atk: 1, def: 1, sta: 1, mana: 1, atkRange: 1 } },
+  5: { name: 'BOSS', color: '#e8b34f', base: { hp: 60, atk: 6, def: 6, sta: 0, mana: 12, atkRange: 3 }, boss: true, parts: 4 },
+};
+const STAT_LIMITS = {
+  hp: [1, 999], atk: [0, 999], def: [0, 999],
+  mana: [0, 999], sta: [0, 999], atkRange: [1, 99],
+};
+
+function vertex(e, scale = 1) {
+  const a = -Math.PI / 2 + e * SECTOR;
+  return { x: Math.cos(a) * R_OUT * scale, z: Math.sin(a) * R_OUT * scale };
+}
+
+function buildCells() {
+  const list = [{ id: 0, ring: 1, idx: 0, region: -1, x: 0, z: 0 }];
+  for (let e = 0; e < 5; e++) {
+    const a = vertex(e);
+    const b = vertex(e + 1);
+    for (let s = 1; s <= 4; s++) {
+      const f = s / 4;
+      for (let k = 0; k < s; k++) {
+        const t = (s - k) / s;
+        const x = f * ((1 - t) * a.x + t * b.x);
+        const z = f * ((1 - t) * a.z + t * b.z);
+        list.push({ id: list.length, ring: s + 1, idx: k, region: e, x, z });
+      }
+    }
+  }
+  const top = -Math.PI / 2;
+  list.forEach(c => {
+    c.sx = c.x * SCALE;
+    c.sy = c.z * SCALE;
+    c.angle = ((Math.atan2(c.z, c.x) - top) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
+  });
+  return list;
+}
+
+const CELLS = buildCells();
+const SPIRAL = CELLS.slice().sort((a, b) => (a.ring - b.ring) || (a.angle - b.angle));
+
+CELLS.forEach(c => { c.neighbors = []; });
+for (let i = 0; i < CELLS.length; i++) {
+  for (let j = i + 1; j < CELLS.length; j++) {
+    if (Math.hypot(CELLS[i].x - CELLS[j].x, CELLS[i].z - CELLS[j].z) <= 1.35) {
+      CELLS[i].neighbors.push(CELLS[j].id);
+      CELLS[j].neighbors.push(CELLS[i].id);
+    }
+  }
+}
+
+function buildDiamonds() {
+  const seen = new Set();
+  const out = [];
+  for (let a = 0; a < CELLS.length; a++) {
+    for (const b of CELLS[a].neighbors) {
+      for (const c of CELLS[b].neighbors) {
+        if (c === a) continue;
+        for (const d of CELLS[c].neighbors) {
+          if (d === a || d === b) continue;
+          if (!CELLS[d].neighbors.includes(a)) continue;
+          const set = [a, b, c, d].sort((x, y) => x - y);
+          const key = set.join(',');
+          if (seen.has(key)) continue;
+          const counts = {};
+          set.forEach(id => { const r = CELLS[id].ring; counts[r] = (counts[r] || 0) + 1; });
+          const pairs = Object.values(counts).sort((x, y) => y - x);
+          if (pairs.length !== 2 || pairs[0] !== 2 || pairs[1] !== 2) continue;
+          seen.add(key);
+          out.push(set);
+        }
+      }
+    }
+  }
+  out.sort((A, B) => {
+    const ma = Math.max(...A.map(id => CELLS[id].ring));
+    const mb = Math.max(...B.map(id => CELLS[id].ring));
+    if (ma !== mb) return ma - mb;
+    const sa = A.reduce((n, id) => n + CELLS[id].ring, 0);
+    const sb = B.reduce((n, id) => n + CELLS[id].ring, 0);
+    if (sa !== sb) return sa - sb;
+    return A.join(',').localeCompare(B.join(','));
+  });
+  const preferred = '1,2,3,41';
+  const pi = out.findIndex(d => d.join(',') === preferred);
+  if (pi > 0) out.unshift(out.splice(pi, 1)[0]);
+  return out;
+}
+
+const DIAMONDS = buildDiamonds();
+const DIAMOND_KEYS = new Set(DIAMONDS.map(d => d.join(',')));
+
+function isBossTemplate(id) {
+  return !!(TEMPLATES[id] && TEMPLATES[id].boss);
+}
+
+function enemyCells(e) {
+  return Array.isArray(e.cells) && e.cells.length ? e.cells : [e.cell];
+}
+
+function enemyIsBoss(e) {
+  return !!(e && (Array.isArray(e.cells) || isBossTemplate(e.template)));
+}
+
+function cellUsedBy(cellId, exceptId) {
+  return level.enemies.some(e => e.id !== exceptId && enemyCells(e).includes(cellId));
+}
+
+function diamondFree(ids, exceptId) {
+  return ids.every(id => !cellUsedBy(id, exceptId));
+}
+
+function diamondCentroid(ids) {
+  let x = 0;
+  let y = 0;
+  for (const id of ids) { x += CELLS[id].sx; y += CELLS[id].sy; }
+  return { x: x / ids.length, y: y / ids.length };
+}
+
+function blankLevel() {
+  return {
+    name: '未命名关卡',
+    type: LEVEL_TYPES[0],
+    cells: new Array(CELL_COUNT).fill(null),
+    enemies: [],
+    nextId: 1,
+  };
+}
+
+let level = blankLevel();
+let selectedId = null;
+let drag = null;
+let toastTimer = 0;
+
+const board = document.getElementById('board');
+const listEl = document.getElementById('enemyList');
+const enemyCount = document.getElementById('enemyCount');
+const nameInput = document.getElementById('levelName');
+const typeSelect = document.getElementById('levelType');
+const saveState = document.getElementById('saveState');
+const toastEl = document.getElementById('toast');
+const importFile = document.getElementById('importFile');
+const envWarning = document.getElementById('envWarning');
+const envWarningText = document.getElementById('envWarningText');
+
+function cellLabel(c) {
+  return c.ring === 1 ? '中心' : `${ATTR_NAME[REGION_ATTR[c.region]]}区·${c.ring}环·${c.idx + 1}`;
+}
+
+function clampInt(value, min, max, fallback) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(max, Math.max(min, Math.round(n)));
+}
+
+function normalizeLevel(raw, strict = false) {
+  if (!raw || typeof raw !== 'object') throw new Error('不是有效的 JSON 对象');
+  if (strict && (!Array.isArray(raw.cells) || raw.cells.length !== CELL_COUNT)) {
+    throw new Error(`cells 必须是 ${CELL_COUNT} 个格子`);
+  }
+  const name = String(raw.name || '未命名关卡').trim().slice(0, 24) || '未命名关卡';
+  const type = LEVEL_TYPES.includes(raw.type) ? raw.type : LEVEL_TYPES[0];
+  const cells = new Array(CELL_COUNT).fill(null);
+  if (Array.isArray(raw.cells)) {
+    for (let i = 0; i < Math.min(CELL_COUNT, raw.cells.length); i++) {
+      const v = raw.cells[i];
+      if (Number.isInteger(v) && v >= 0 && v <= 4) cells[i] = v;
+    }
+  }
+  const used = new Set();
+  const enemies = [];
+  const list = Array.isArray(raw.enemies) ? raw.enemies : [];
+  for (const item of list) {
+    if (!item || typeof item !== 'object') continue;
+    const rawTemplate = TEMPLATES[Number(item.template)] ? Number(item.template) : 1;
+    const rawCells = Array.isArray(item.cells)
+      ? [...new Set(item.cells.filter(id => Number.isInteger(id) && id >= 0 && id < CELL_COUNT))]
+      : [];
+    const asBoss = rawTemplate === 5 || rawCells.length === 4;
+    let cellIds;
+    if (asBoss) {
+      if (rawCells.length !== 4) continue;
+      const key = rawCells.slice().sort((a, b) => a - b).join(',');
+      if (!DIAMOND_KEYS.has(key)) continue;
+      if (rawCells.some(id => used.has(id))) continue;
+      const diamond = DIAMONDS.find(d => d.join(',') === key);
+      cellIds = diamond ? diamond.slice() : rawCells.slice();
+      cellIds.forEach(id => used.add(id));
+    } else {
+      const cell = Number.isInteger(item.cell) ? item.cell : -1;
+      if (cell < 0 || cell >= CELL_COUNT || used.has(cell)) continue;
+      used.add(cell);
+      cellIds = [cell];
+    }
+    const template = asBoss ? 5 : rawTemplate;
+    const base = TEMPLATES[template].base;
+    const attr = Number.isInteger(item.attr) && item.attr >= 0 && item.attr <= 4 ? item.attr : 0;
+    const enemy = {
+      id: enemies.length + 1,
+      template,
+      attr,
+      hp: clampInt(item.hp, 1, 999, base.hp),
+      atk: clampInt(item.atk, 0, 999, base.atk),
+      def: clampInt(item.def, 0, 999, base.def),
+      mana: clampInt(item.mana, 0, 999, base.mana),
+      sta: clampInt(item.sta, 0, 999, base.sta),
+      atkRange: clampInt(item.atkRange, 1, 99, base.atkRange),
+      cell: cellIds[0],
+    };
+    if (asBoss) enemy.cells = cellIds;
+    enemies.push(enemy);
+  }
+  return { name, type, cells, enemies, nextId: enemies.length + 1 };
+}
+
+function serialize() {
+  return {
+    v: 1,
+    name: level.name,
+    type: level.type,
+    cells: level.cells.slice(),
+    enemies: level.enemies.map(e => {
+      const out = {
+        id: e.id,
+        template: e.template,
+        attr: e.attr,
+        hp: e.hp,
+        atk: e.atk,
+        def: e.def,
+        sta: e.sta,
+        mana: e.mana,
+        atkRange: e.atkRange,
+        cell: e.cell,
+      };
+      if (enemyIsBoss(e)) out.cells = enemyCells(e).slice();
+      return out;
+    }),
+  };
+}
+
+function saveNow(silent = false) {
+  try {
+    localStorage.setItem(SAVE_KEY, JSON.stringify(serialize()));
+    saveState.textContent = '已自动暂存 ' + new Date().toLocaleTimeString('zh-CN', { hour12: false });
+    if (!silent) toast('已暂存到本机');
+  } catch (e) {
+    saveState.textContent = '暂存失败';
+    if (!silent) toast('暂存失败：浏览器存储不可用', true);
+  }
+}
+
+function autosave() {
+  saveNow(true);
+}
+
+function toast(text, bad = false) {
+  toastEl.textContent = text;
+  toastEl.classList.toggle('bad', bad);
+  toastEl.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toastEl.classList.remove('show'), 2300);
+}
+
+function showEnvWarning(text) {
+  envWarningText.innerHTML = text;
+  envWarning.classList.add('show');
+}
+
+function hideEnvWarning() {
+  envWarning.classList.remove('show');
+}
+
+async function checkServer() {
+  if (location.protocol === 'file:') {
+    showEnvWarning('<b>当前是直接打开 HTML 文件</b>：浏览器无法写入「关卡集」。请关闭本页，双击「程序/启动关卡编辑器.bat」；不要直接双击 level_editor.html。也可以先下载备份。');
+    return;
+  }
+  try {
+    const res = await fetch('/__health', { cache: 'no-store' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const info = await res.json();
+    if (!info || info.save !== true) throw new Error('服务版本过旧');
+    hideEnvWarning();
+  } catch (e) {
+    showEnvWarning('<b>无法连接本地保存服务</b>：请关闭游戏页 / 旧服务（游戏右上角「关闭服务」），等待几秒后重新双击「启动关卡编辑器.bat」；当前可先下载备份。');
+  }
+}
+
+function downloadLevel() {
+  const data = serialize();
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = (level.name || 'level').replace(/[\\/:*?"<>|]/g, '_') + '.json';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function templateOptions(selected) {
+  return Object.entries(TEMPLATES)
+    .map(([id, t]) => `<option value="${id}"${Number(id) === selected ? ' selected' : ''}>${id} ${t.name}</option>`)
+    .join('');
+}
+
+function attrOptions(selected) {
+  return ATTR_NAME.map((n, i) => `<option value="${i}"${i === selected ? ' selected' : ''}>${n}</option>`).join('');
+}
+
+function renderMeta() {
+  nameInput.value = level.name;
+  typeSelect.value = level.type;
+}
+
+function renderBoard() {
+  const pts = (scale) => Array.from({ length: 5 }, (_, i) => {
+    const v = vertex(i, scale);
+    return `${(v.x * SCALE).toFixed(2)},${(v.z * SCALE).toFixed(2)}`;
+  }).join(' ');
+  const spokes = Array.from({ length: 5 }, (_, i) => {
+    const v = vertex(i);
+    return `<line x1="0" y1="0" x2="${(v.x * SCALE).toFixed(2)}" y2="${(v.z * SCALE).toFixed(2)}"/>`;
+  }).join('');
+  const inner = [0.25, 0.5, 0.75].map(s => `<polygon points="${pts(s)}"/>`).join('');
+  const cellSvg = CELLS.map(c => {
+    const attr = level.cells[c.id];
+    const hex = attr === null ? '#2c3d56' : ATTR_HEX[attr];
+    const fill = attr === null ? '#141e2d' : ATTR_HEX[attr];
+    const label = attr === null ? '' : ATTR_NAME[attr];
+    return `<g class="cell" data-cell="${c.id}" transform="translate(${c.sx.toFixed(2)} ${c.sy.toFixed(2)})">
+      <circle r="31.5" fill="${fill}" fill-opacity="${attr === null ? 1 : 0.22}" stroke="${hex}" stroke-width="${attr === null ? 1 : 2}"/>
+      ${attr === null ? '<circle r="2.5" fill="#3d506b"/>' : `<text text-anchor="middle" dominant-baseline="central" font-size="17" fill="${hex}">${label}</text>`}
+      <title>${cellLabel(c)} · ${attr === null ? '无属性' : ATTR_NAME[attr]}</title>
+    </g>`;
+  }).join('');
+  const footprintSvg = level.enemies.filter(enemyIsBoss).map(e => {
+    const ids = enemyCells(e);
+    const c = diamondCentroid(ids);
+    const tpl = TEMPLATES[e.template];
+    const ordered = ids.slice().sort((a, b) =>
+      Math.atan2(CELLS[a].sy - c.y, CELLS[a].sx - c.x) - Math.atan2(CELLS[b].sy - c.y, CELLS[b].sx - c.x));
+    const points = ordered.map(id => `${CELLS[id].sx.toFixed(2)},${CELLS[id].sy.toFixed(2)}`).join(' ');
+    const sel = e.id === selectedId;
+    return `<g class="boss-footprint">
+      ${ids.map(id => {
+        const cell = CELLS[id];
+        return `<circle class="boss-part" data-enemy="${e.id}" cx="${cell.sx.toFixed(2)}" cy="${cell.sy.toFixed(2)}" r="34" fill="${tpl.color}" fill-opacity=".08" stroke="${tpl.color}" stroke-width="2" stroke-dasharray="5 4"><title>BOSS ${e.id} 部位</title></circle>`;
+      }).join('')}
+      ${sel ? `<polygon points="${points}" fill="none" stroke="#ffffff" stroke-width="1.5" stroke-dasharray="4 3" opacity=".85"/>` : ''}
+    </g>`;
+  }).join('');
+  const tokenSvg = level.enemies.map(e => {
+    const tpl = TEMPLATES[e.template];
+    const sel = e.id === selectedId;
+    if (enemyIsBoss(e)) {
+      const ids = enemyCells(e);
+      const c = diamondCentroid(ids);
+      const color = ATTR_HEX[e.attr];
+      return `<g class="token boss${sel ? ' selected' : ''}" data-enemy="${e.id}" transform="translate(${c.x.toFixed(2)} ${c.y.toFixed(2)})">
+        <title>BOSS ${e.id} · ${tpl.name} · ${ATTR_NAME[e.attr]}属性 · 四格</title>
+        ${sel ? '<circle r="26" fill="none" stroke="#ffffff" stroke-width="1.5" stroke-dasharray="4 3"/>' : ''}
+        <circle r="20" fill="#0b1220" stroke="${color}" stroke-width="3"/>
+        <circle cx="15" cy="-15" r="6" fill="${tpl.color}" stroke="#0b1220" stroke-width="1.5"/>
+        <text text-anchor="middle" dominant-baseline="central" font-size="11" font-weight="700" fill="${color}">B${e.id}</text>
+      </g>`;
+    }
+    const c = CELLS[e.cell];
+    const color = ATTR_HEX[e.attr];
+    return `<g class="token${sel ? ' selected' : ''}" data-enemy="${e.id}" transform="translate(${c.sx.toFixed(2)} ${c.sy.toFixed(2)})">
+      <title>敌人 ${e.id} · ${tpl.name} · ${ATTR_NAME[e.attr]}属性</title>
+      ${sel ? '<circle r="23" fill="none" stroke="#ffffff" stroke-width="1.5" stroke-dasharray="4 3"/>' : ''}
+      <circle r="17" fill="#0b1220" stroke="${color}" stroke-width="3"/>
+      <circle cx="13" cy="-13" r="5" fill="${tpl.color}" stroke="#0b1220" stroke-width="1.5"/>
+      <text text-anchor="middle" dominant-baseline="central" font-size="10" font-weight="700" fill="${color}">E${e.id}</text>
+    </g>`;
+  }).join('');
+  board.innerHTML = `
+    <polygon points="${pts(1.075)}" fill="#111a29" stroke="#2f4a6b" stroke-width="2"/>
+    <g fill="none" stroke="#22344c" stroke-width="1">${inner}${spokes}</g>
+    <g class="cells">${cellSvg}</g>
+    <g class="boss-footprints">${footprintSvg}</g>
+    <g class="tokens">${tokenSvg}</g>
+    <g id="dragLayer"></g>
+  `;
+}
+
+function renderEnemies() {
+  enemyCount.textContent = level.enemies.length;
+  if (!level.enemies.length) {
+    listEl.innerHTML = '<div class="empty">还没有敌人<br><span>点击右上角「+ 新增敌人」或「+ 新增 BOSS」</span></div>';
+    return;
+  }
+  listEl.innerHTML = level.enemies.map(e => {
+    const tpl = TEMPLATES[e.template];
+    const boss = enemyIsBoss(e);
+    const pos = boss ? '四格菱形' : cellLabel(CELLS[e.cell]);
+    const posTitle = boss
+      ? enemyCells(e).map(id => cellLabel(CELLS[id])).join(' / ')
+      : cellLabel(CELLS[e.cell]);
+    return `<div class="enemy-card${e.id === selectedId ? ' selected' : ''}" data-id="${e.id}" style="--tpl:${tpl.color}">
+      <div class="ec-head">
+        <span class="ec-dot"></span>
+        <span class="ec-id">敌人 ${e.id}</span>
+        <span class="ec-tpl">${tpl.name}</span>
+        <span class="ec-pos" title="${posTitle}">${pos}</span>
+        <button class="ec-del" data-del="${e.id}" title="删除敌人">×</button>
+      </div>
+      <div class="ec-fields">
+        <label>模板
+          <select data-field="template">${templateOptions(e.template)}</select>
+        </label>
+        <label>主属性
+          <select data-field="attr">${attrOptions(e.attr)}</select>
+        </label>
+        <label>血量
+          <input type="number" data-field="hp" min="1" max="999" step="1" value="${e.hp}">
+        </label>
+        <label>攻击力
+          <input type="number" data-field="atk" min="0" max="999" step="1" value="${e.atk}">
+        </label>
+        <label>防御力
+          <input type="number" data-field="def" min="0" max="999" step="1" value="${e.def}">
+        </label>
+        <label>魔力
+          <input type="number" data-field="mana" min="0" max="999" step="1" value="${e.mana}">
+        </label>
+        <label>体力
+          <input type="number" data-field="sta" min="0" max="999" step="1" value="${e.sta}">
+        </label>
+        <label>攻击范围
+          <input type="number" data-field="atkRange" min="1" max="99" step="1" value="${e.atkRange}">
+        </label>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderAll() {
+  renderMeta();
+  renderBoard();
+  renderEnemies();
+}
+
+function selectEnemy(id) {
+  if (selectedId === id) return;
+  if (!level.enemies.some(e => e.id === id)) return;
+  selectedId = id;
+  listEl.querySelectorAll('.enemy-card').forEach(card => {
+    card.classList.toggle('selected', Number(card.dataset.id) === id);
+  });
+  renderBoard();
+  const card = listEl.querySelector(`.enemy-card[data-id="${id}"]`);
+  if (card) card.scrollIntoView({ block: 'nearest' });
+}
+
+function addEnemy() {
+  const free = SPIRAL.find(c => !cellUsedBy(c.id, null));
+  if (!free) {
+    toast('棋盘上已经没有空位了', true);
+    return;
+  }
+  const id = level.nextId++;
+  const base = TEMPLATES[1].base;
+  level.enemies.push({
+    id,
+    template: 1,
+    attr: 0,
+    hp: base.hp,
+    atk: base.atk,
+    def: base.def,
+    mana: base.mana,
+    sta: base.sta,
+    atkRange: base.atkRange,
+    cell: free.id,
+  });
+  selectedId = id;
+  renderEnemies();
+  renderBoard();
+  autosave();
+  const card = listEl.querySelector(`.enemy-card[data-id="${id}"]`);
+  if (card) card.scrollIntoView({ block: 'nearest' });
+  toast(`已在${cellLabel(free)}生成敌人 ${id}`);
+}
+
+function addBoss() {
+  const diamond = DIAMONDS.find(ids => diamondFree(ids, null));
+  if (!diamond) {
+    toast('棋盘上已经没有空出的四格菱形了', true);
+    return;
+  }
+  const id = level.nextId++;
+  const base = TEMPLATES[5].base;
+  level.enemies.push({
+    id,
+    template: 5,
+    attr: 0,
+    hp: base.hp,
+    atk: base.atk,
+    def: base.def,
+    mana: base.mana,
+    sta: base.sta,
+    atkRange: base.atkRange,
+    cell: diamond[0],
+    cells: diamond.slice(),
+  });
+  selectedId = id;
+  renderEnemies();
+  renderBoard();
+  autosave();
+  const card = listEl.querySelector(`.enemy-card[data-id="${id}"]`);
+  if (card) card.scrollIntoView({ block: 'nearest' });
+  toast(`已生成 BOSS ${id}（四格菱形）`);
+}
+
+function deleteEnemy(id) {
+  const enemy = level.enemies.find(e => e.id === id);
+  if (!enemy) return;
+  if (!confirm(`删除敌人 ${id}？`)) return;
+  level.enemies = level.enemies.filter(e => e.id !== id);
+  if (selectedId === id) selectedId = level.enemies[0] ? level.enemies[0].id : null;
+  renderEnemies();
+  renderBoard();
+  autosave();
+  toast(`已删除敌人 ${id}`);
+}
+
+function cycleCell(id) {
+  const cur = level.cells[id];
+  level.cells[id] = cur === null ? 0 : (cur === 4 ? null : cur + 1);
+  renderBoard();
+  autosave();
+}
+
+function setDropRing(cell, ok) {
+  const layer = board.querySelector('#dragLayer');
+  if (!layer) return;
+  layer.innerHTML = cell
+    ? `<circle cx="${cell.sx.toFixed(2)}" cy="${cell.sy.toFixed(2)}" r="36" fill="none" stroke="${ok ? '#7fd4ff' : '#f08a8a'}" stroke-width="3" stroke-dasharray="6 4"/>`
+    : '';
+}
+
+function svgPoint(ev) {
+  const pt = board.createSVGPoint();
+  pt.x = ev.clientX;
+  pt.y = ev.clientY;
+  return pt.matrixTransform(board.getScreenCTM().inverse());
+}
+
+function nearestCell(pt) {
+  let best = null;
+  let bestD = Infinity;
+  for (const c of CELLS) {
+    const d = Math.hypot(c.sx - pt.x, c.sy - pt.y);
+    if (d < bestD) { bestD = d; best = c; }
+  }
+  return bestD <= 42 ? best : null;
+}
+
+function setDropDiamond(ids, ok) {
+  const layer = board.querySelector('#dragLayer');
+  if (!layer) return;
+  if (!ids) { layer.innerHTML = ''; return; }
+  const color = ok ? '#7fd4ff' : '#f08a8a';
+  layer.innerHTML = ids.map(id => {
+    const c = CELLS[id];
+    return `<circle cx="${c.sx.toFixed(2)}" cy="${c.sy.toFixed(2)}" r="36" fill="${color}" fill-opacity=".08" stroke="${color}" stroke-width="3" stroke-dasharray="6 4"/>`;
+  }).join('');
+}
+
+function nearestDiamond(pt, exceptId) {
+  let best = null;
+  let bestD = Infinity;
+  for (const ids of DIAMONDS) {
+    if (!diamondFree(ids, exceptId)) continue;
+    const c = diamondCentroid(ids);
+    const d = Math.hypot(c.x - pt.x, c.y - pt.y);
+    if (d < bestD) { bestD = d; best = ids; }
+  }
+  return bestD <= 90 ? best : null;
+}
+
+function onBoardPointerDown(ev) {
+  if (ev.button !== 0) return;
+  const tokenEl = ev.target.closest('[data-enemy]');
+  if (tokenEl) {
+    const id = Number(tokenEl.dataset.enemy);
+    const enemy = level.enemies.find(e => e.id === id);
+    selectEnemy(id);
+    drag = {
+      id,
+      isBoss: enemyIsBoss(enemy),
+      pointerId: ev.pointerId,
+      startX: ev.clientX,
+      startY: ev.clientY,
+      moved: false,
+      target: null,
+      targetDiamond: null,
+      blocked: false,
+    };
+    const token = board.querySelector(`.token[data-enemy="${id}"]`);
+    if (token) token.classList.add('dragging');
+    window.addEventListener('pointermove', onDragMove);
+    window.addEventListener('pointerup', onDragUp);
+    window.addEventListener('pointercancel', onDragUp);
+    ev.preventDefault();
+    return;
+  }
+  const cellEl = ev.target.closest('[data-cell]');
+  if (cellEl) {
+    cycleCell(Number(cellEl.dataset.cell));
+  }
+}
+
+function onDragMove(ev) {
+  if (!drag || ev.pointerId !== drag.pointerId) return;
+  if (Math.hypot(ev.clientX - drag.startX, ev.clientY - drag.startY) > 3) drag.moved = true;
+  const pt = svgPoint(ev);
+  const token = board.querySelector(`.token[data-enemy="${drag.id}"]`);
+  if (token) token.setAttribute('transform', `translate(${pt.x.toFixed(2)} ${pt.y.toFixed(2)})`);
+
+  if (drag.isBoss) {
+    const diamond = nearestDiamond(pt, drag.id);
+    drag.targetDiamond = diamond ? diamond.slice() : null;
+    drag.target = null;
+    drag.blocked = !diamond;
+    setDropDiamond(diamond, !!diamond);
+    return;
+  }
+
+  const cell = nearestCell(pt);
+  const blocked = !!(cell && cellUsedBy(cell.id, drag.id));
+  drag.target = cell ? cell.id : null;
+  drag.blocked = blocked;
+  setDropRing(cell, !blocked);
+}
+
+function onDragUp(ev) {
+  if (!drag || ev.pointerId !== drag.pointerId) return;
+  const d = drag;
+  drag = null;
+  window.removeEventListener('pointermove', onDragMove);
+  window.removeEventListener('pointerup', onDragUp);
+  window.removeEventListener('pointercancel', onDragUp);
+  const enemy = level.enemies.find(e => e.id === d.id);
+  if (!d.moved) {
+    renderBoard();
+    return;
+  }
+  if (enemy && enemyIsBoss(enemy)) {
+    if (!d.targetDiamond) {
+      toast('BOSS 必须放在空出的四格菱形上', true);
+      renderBoard();
+      return;
+    }
+    const changed = JSON.stringify(enemy.cells || []) !== JSON.stringify(d.targetDiamond);
+    enemy.cells = d.targetDiamond.slice();
+    enemy.cell = enemy.cells[0];
+    autosave();
+    renderEnemies();
+    renderBoard();
+    if (changed) toast('BOSS 已移动');
+    return;
+  }
+  if (!enemy || d.target === null) {
+    renderBoard();
+    return;
+  }
+  if (d.blocked) {
+    toast('该格已有敌人', true);
+    renderBoard();
+    return;
+  }
+  if (enemy.cell !== d.target) {
+    enemy.cell = d.target;
+    autosave();
+    renderEnemies();
+    toast(`敌人 ${enemy.id} → ${cellLabel(CELLS[d.target])}`);
+  }
+  renderBoard();
+}
+
+async function saveLevelToFolder() {
+  const btn = document.getElementById('publishBtn');
+  if (btn) btn.disabled = true;
+  saveNow(true);
+  if (location.protocol === 'file:') {
+    downloadLevel();
+    toast('未通过启动器打开，已下载 JSON 备份；请用「启动关卡编辑器.bat」保存到关卡集', true);
+    if (btn) btn.disabled = false;
+    return;
+  }
+  try {
+    const res = await fetch('/__save_level', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(serialize()),
+    });
+    const out = await res.json().catch(() => null);
+    if (!res.ok || !out || !out.ok) {
+      throw new Error((out && out.error) || ('HTTP ' + res.status));
+    }
+    saveState.textContent = '已存入关卡集';
+    toast('已保存到 ' + out.file + (out.overwrote ? '（覆盖）' : ''));
+  } catch (e) {
+    downloadLevel();
+    toast('保存到关卡集失败：' + (e && e.message ? e.message : '服务未启动') + '；已下载 JSON 备份', true);
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+function loadFromStorage() {
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (!raw) return false;
+    level = normalizeLevel(JSON.parse(raw));
+    selectedId = null;
+    saveState.textContent = '已恢复上次编辑';
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+function bindEvents() {
+  typeSelect.innerHTML = LEVEL_TYPES.map(t => `<option value="${t}">${t}</option>`).join('');
+  nameInput.addEventListener('input', () => {
+    level.name = nameInput.value.slice(0, 24);
+    autosave();
+  });
+  typeSelect.addEventListener('change', () => {
+    level.type = typeSelect.value;
+    autosave();
+  });
+  document.getElementById('addEnemy').addEventListener('click', addEnemy);
+  document.getElementById('addBoss').addEventListener('click', addBoss);
+  document.getElementById('publishBtn').addEventListener('click', saveLevelToFolder);
+  document.getElementById('importBtn').addEventListener('click', () => importFile.click());
+  document.getElementById('envDownload').addEventListener('click', () => {
+    downloadLevel();
+    toast('已下载 JSON 备份');
+  });
+  document.getElementById('newBtn').addEventListener('click', () => {
+    if (!confirm('新建关卡会清空当前内容，确定吗？')) return;
+    level = blankLevel();
+    selectedId = null;
+    renderAll();
+    autosave();
+    toast('已新建空白关卡');
+  });
+  importFile.addEventListener('change', async () => {
+    const file = importFile.files && importFile.files[0];
+    importFile.value = '';
+    if (!file) return;
+    try {
+      const text = (await file.text()).replace(/^\uFEFF/, '');
+      const raw = JSON.parse(text);
+      if (!confirm('导入会替换当前编辑内容，确定吗？')) return;
+      level = normalizeLevel(raw, true);
+      selectedId = null;
+      renderAll();
+      autosave();
+      toast(`已导入：${level.enemies.length} 个敌人`);
+    } catch (e) {
+      toast('导入失败：' + (e && e.message ? e.message : '文件格式错误'), true);
+    }
+  });
+  listEl.addEventListener('click', ev => {
+    const card = ev.target.closest('.enemy-card');
+    if (!card) return;
+    const id = Number(card.dataset.id);
+    if (ev.target.closest('[data-del]')) {
+      ev.stopPropagation();
+      deleteEnemy(id);
+      return;
+    }
+    selectEnemy(id);
+  });
+  listEl.addEventListener('input', ev => {
+    const el = ev.target;
+    const field = el.dataset.field;
+    if (!STAT_LIMITS[field]) return;
+    const card = el.closest('.enemy-card');
+    if (!card) return;
+    const enemy = level.enemies.find(e => e.id === Number(card.dataset.id));
+    if (!enemy) return;
+    if (el.value.trim() === '') return;
+    const v = Number(el.value);
+    if (!Number.isFinite(v)) return;
+    const [min, max] = STAT_LIMITS[field];
+    enemy[field] = Math.min(max, Math.max(min, Math.round(v)));
+    autosave();
+  });
+  listEl.addEventListener('change', ev => {
+    const el = ev.target;
+    const field = el.dataset.field;
+    if (!field) return;
+    const card = el.closest('.enemy-card');
+    if (!card) return;
+    const enemy = level.enemies.find(e => e.id === Number(card.dataset.id));
+    if (!enemy) return;
+    if (field === 'template') {
+      const newTpl = TEMPLATES[Number(el.value)] ? Number(el.value) : 1;
+      if (newTpl === 5 && !enemyIsBoss(enemy)) {
+        const diamond = DIAMONDS.find(ids => ids.includes(enemy.cell) && diamondFree(ids, enemy.id));
+        if (!diamond) {
+          toast('该位置周围没有空出的四格菱形，无法转换为 BOSS', true);
+          renderEnemies();
+          return;
+        }
+        enemy.template = 5;
+        enemy.cells = diamond.slice();
+        enemy.cell = diamond[0];
+      } else if (newTpl !== 5 && enemyIsBoss(enemy)) {
+        enemy.template = newTpl;
+        delete enemy.cells;
+      } else {
+        enemy.template = newTpl;
+      }
+      renderEnemies();
+      renderBoard();
+    } else if (field === 'attr') {
+      enemy.attr = Number(el.value);
+      renderBoard();
+    } else {
+      const [min, max] = STAT_LIMITS[field] || [0, 999];
+      enemy[field] = clampInt(el.value, min, max, min);
+      el.value = enemy[field];
+    }
+    autosave();
+  });
+  board.addEventListener('pointerdown', onBoardPointerDown);
+  window.addEventListener('pagehide', () => {
+    try { navigator.sendBeacon('/__bye'); } catch (e) {}
+  });
+}
+
+function init() {
+  const restored = loadFromStorage();
+  bindEvents();
+  renderAll();
+  if (!restored) saveState.textContent = '未暂存';
+  const heartbeat = () => fetch('/__hb', { cache: 'no-store' }).catch(() => {});
+  heartbeat();
+  setInterval(heartbeat, 2000);
+  checkServer();
+}
+
+init();
+</script>
+</body>
+</html>
