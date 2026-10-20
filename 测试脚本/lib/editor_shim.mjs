@@ -75,7 +75,7 @@ const document = {
 globalThis.window = globalThis;
 globalThis.self = globalThis;
 globalThis.document = document;
-globalThis.location = { protocol: 'http:', href: 'http://127.0.0.1:8765/程序/level_editor.html' };
+globalThis.location = { protocol: 'http:', href: 'http://127.0.0.1:8765/app/level_editor.html' };
 globalThis.devicePixelRatio = 1;
 globalThis.addEventListener = () => {};
 globalThis.removeEventListener = () => {};

@@ -11,7 +11,7 @@ function ensureBuild() {
 }
 
 function replaceGameSource(src) {
-  const threeUrl = pathToFileURL(path.join(ROOT, '程序', 'three.module.js')).href;
+  const threeUrl = pathToFileURL(path.join(ROOT, 'app', 'three.module.js')).href;
   src = src.replace("import * as THREE from 'three';", `import * as THREE from '${threeUrl}';`);
   src = src.replace(
     /const renderer = new THREE\.WebGLRenderer\(\{[^}]*\}\);/,
@@ -42,7 +42,7 @@ export function buildGameCase(name, bodyFile) {
 
 export function buildEditorCase(name, bodyFile) {
   ensureBuild();
-  const html = fs.readFileSync(path.join(ROOT, '程序', 'level_editor.html'), 'utf8');
+  const html = fs.readFileSync(path.join(ROOT, 'app', 'level_editor.html'), 'utf8');
   const match = html.match(/<script>([\s\S]*?)<\/script>/);
   if (!match) throw new Error('editor script not found');
   const body = fs.readFileSync(bodyFile, 'utf8');

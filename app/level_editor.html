@@ -498,7 +498,7 @@ function hideEnvWarning() {
 
 async function checkServer() {
   if (location.protocol === 'file:') {
-    showEnvWarning('<b>当前是直接打开 HTML 文件</b>：浏览器无法写入「关卡集」。请关闭本页，双击「程序/启动关卡编辑器.bat」；不要直接双击 level_editor.html。也可以先下载备份。');
+    showEnvWarning('<b>当前是直接打开 HTML 文件</b>：浏览器无法写入「关卡集」。请关闭本页，双击「app/启动关卡编辑器.bat」；不要直接双击 level_editor.html。也可以先下载备份。');
     return;
   }
   try {

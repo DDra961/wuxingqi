@@ -3,7 +3,7 @@ opencode.json
 配置/
 
 # Runtime logs
-日志/
+logs/
 *.log
 
 # Python cache
