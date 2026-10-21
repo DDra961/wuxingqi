@@ -1,5 +1,6 @@
 # Local tool configuration (contains credentials)
 opencode.json
+opencode.json.applied_patches
 配置/
 
 # Runtime logs
